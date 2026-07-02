@@ -1,0 +1,184 @@
+﻿<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>あなただけの今日の星よみ</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #20312f;
+        --muted: #647371;
+        --paper: #fbfaf5;
+        --panel: #ffffff;
+        --sage: #52756d;
+        --sage-dark: #284d49;
+        --gold: #b08a46;
+        --mist: #e8efea;
+        --line: #d8e1dc;
+        font-family: "Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 18% 8%, rgba(176, 138, 70, 0.14), transparent 26%),
+          linear-gradient(180deg, #f7f8f0 0%, #edf4f0 52%, #fbfaf5 100%);
+      }
+      main { width: min(960px, 100%); margin: 0 auto; padding: 28px 18px 44px; }
+      .hero { min-height: 30vh; display: grid; align-content: end; gap: 12px; padding: 24px 0 18px; }
+      h1 { margin: 0; font-size: clamp(2rem, 8vw, 4.8rem); line-height: 1.08; font-weight: 600; letter-spacing: 0; }
+      .subcopy { max-width: 680px; margin: 0; color: var(--muted); font-size: 1rem; line-height: 1.9; }
+      .workspace { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 18px; align-items: start; }
+      form, .result, .loading { background: rgba(255, 255, 255, 0.86); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 18px 50px rgba(55, 74, 70, 0.1); }
+      form { display: grid; gap: 14px; padding: 18px; }
+      label { display: grid; gap: 7px; color: var(--muted); font-size: 0.85rem; }
+      input { width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; background: var(--paper); color: var(--ink); font: inherit; }
+      input:focus { outline: 2px solid rgba(82, 117, 109, 0.24); border-color: var(--sage); }
+      button { min-height: 48px; border: 0; border-radius: 6px; background: var(--sage-dark); color: white; font: inherit; cursor: pointer; }
+      button:disabled { cursor: wait; opacity: 0.72; }
+      .hint, .error { min-height: 20px; margin: 0; font-size: 0.86rem; line-height: 1.6; }
+      .hint { color: var(--muted); }
+      .error { color: #9d3e32; }
+      .result, .loading { padding: 20px; }
+      .eyebrow { margin: 0 0 8px; color: var(--gold); font-size: 0.85rem; }
+      h2 { margin: 0 0 14px; font-size: 1.35rem; line-height: 1.5; }
+      .message { white-space: pre-line; font-size: 1rem; line-height: 2; }
+      .details { margin-top: 18px; border-top: 1px solid var(--line); }
+      .details summary { cursor: pointer; padding: 14px 0 6px; color: var(--sage-dark); }
+      .flow { display: grid; gap: 8px; margin-top: 8px; }
+      .flow-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; padding: 10px; border-radius: 6px; background: var(--mist); color: var(--ink); font-size: 0.92rem; }
+      .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--gold); }
+      .loading { display: none; gap: 12px; }
+      .loading.active { display: grid; }
+      .stars { display: flex; gap: 7px; }
+      .stars span { width: 9px; height: 9px; border-radius: 999px; background: var(--sage); animation: pulse 1.2s ease-in-out infinite; }
+      .stars span:nth-child(2) { animation-delay: 0.2s; }
+      .stars span:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes pulse { 0%, 100% { opacity: 0.35; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-4px); } }
+      @media (max-width: 760px) { main { padding-inline: 14px; } .workspace { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <h1>あなただけの今日の星よみ</h1>
+        <p class="subcopy">生年月日と現在の星の配置から、今日あなたに強く影響しているテーマを読み解きます。</p>
+      </section>
+      <section class="workspace">
+        <form id="reading-form">
+          <label>お名前<input id="name" name="name" autocomplete="name" placeholder="例：おます" /></label>
+          <label>生年月日<input id="birth-date" name="birth_date" type="date" required /></label>
+          <label>生まれた時間<input id="birth-time" name="birth_time" type="time" /></label>
+          <button id="submit" type="submit">今日の星をよむ</button>
+          <p id="form-note" class="hint">生まれた時間がわからない場合は空欄のままで大丈夫です。</p>
+          <p id="error" class="error" aria-live="polite"></p>
+        </form>
+        <section>
+          <div id="loading" class="loading">
+            <div class="stars"><span></span><span></span><span></span></div>
+            <p id="loading-text" class="hint">出生図を確認しています。</p>
+          </div>
+          <article id="result" class="result" hidden>
+            <p class="eyebrow">今日のテーマ</p>
+            <h2 id="theme"></h2>
+            <div id="message" class="message"></div>
+            <details class="details">
+              <summary>現在の星の動き</summary>
+              <div id="flow" class="flow"></div>
+            </details>
+          </article>
+        </section>
+      </section>
+    </main>
+    <script>
+      const LIFF_ID = "__LIFF_ID__";
+      const loadingMessages = ["出生図を確認しています。", "いまの星の流れを重ねています。", "今日強く出ているテーマを選んでいます。", "言葉を整えています。"];
+      const demoReading = {
+        theme: "いまの星まわりでは、月と太陽が重なっています。",
+        message: "今日の星まわりでは、気持ちと方向性が同じ場所に集まりやすくなっています。\n\n大きな決断を急ぐより、今の自分が何に安心するのかを先に見てあげると整いやすい日です。\n\n部屋の一角を片づける、短い返信を返す、予定をひとつ減らす。そんな小さな調整が、思ったより深く効いてきます。",
+        highlights: [
+          { planets: ["月", "太陽"], aspect: "重なって", angle: 0.8 },
+          { planets: ["木星", "金星"], aspect: "支え合って", angle: 120.1 },
+          { planets: ["水星", "土星"], aspect: "見直しを促して", angle: 91.4 }
+        ]
+      };
+      const form = document.querySelector("#reading-form");
+      const submit = document.querySelector("#submit");
+      const error = document.querySelector("#error");
+      const loading = document.querySelector("#loading");
+      const loadingText = document.querySelector("#loading-text");
+      const result = document.querySelector("#result");
+      const theme = document.querySelector("#theme");
+      const message = document.querySelector("#message");
+      const flow = document.querySelector("#flow");
+      let lineIdToken = "";
+      async function initLiff() {
+        if (!LIFF_ID || !window.liff) return;
+        try {
+          await liff.init({ liffId: LIFF_ID });
+          if (liff.isLoggedIn()) lineIdToken = liff.getIDToken() || "";
+        } catch (_) { lineIdToken = ""; }
+      }
+      function renderReading(data) {
+        theme.textContent = data.theme;
+        message.textContent = data.message;
+        flow.innerHTML = "";
+        data.highlights.forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "flow-row";
+          row.innerHTML = `<span>${item.planets[0]}</span><span class="dot"></span><span>${item.planets[1]} ${item.angle}度</span>`;
+          flow.appendChild(row);
+        });
+        result.hidden = false;
+      }
+      function setLoading(active) {
+        submit.disabled = active;
+        loading.classList.toggle("active", active);
+        if (!active) return;
+        let index = 0;
+        loadingText.textContent = loadingMessages[index];
+        const timer = setInterval(() => {
+          if (!submit.disabled) { clearInterval(timer); return; }
+          index = (index + 1) % loadingMessages.length;
+          loadingText.textContent = loadingMessages[index];
+        }, 1400);
+      }
+      async function requestReading(payload) {
+        if (location.protocol === "file:") {
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+          return demoReading;
+        }
+        const response = await fetch("/api/reading", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(lineIdToken ? { "X-Line-ID-Token": lineIdToken } : {}) },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.detail || "星よみを作れませんでした。少し時間をおいて試してください。");
+        }
+        return response.json();
+      }
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        error.textContent = "";
+        result.hidden = true;
+        const payload = {
+          name: document.querySelector("#name").value.trim() || null,
+          birth_date: document.querySelector("#birth-date").value,
+          birth_time: document.querySelector("#birth-time").value || null
+        };
+        if (!payload.birth_date) { error.textContent = "生年月日を入力してください。"; return; }
+        setLoading(true);
+        try { renderReading(await requestReading(payload)); }
+        catch (err) { error.textContent = err.message; }
+        finally { setLoading(false); }
+      });
+      initLiff();
+    </script>
+  </body>
+</html>
