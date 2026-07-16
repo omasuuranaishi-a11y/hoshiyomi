@@ -1,0 +1,20 @@
+name: Diagnose Story Service
+on:
+  push:
+    branches: [main]
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Generate without publishing
+        env:
+          AUTOMATION_URL: ${{ secrets.AUTOMATION_URL }}
+          AUTOMATION_SECRET: ${{ secrets.AUTOMATION_SECRET }}
+        run: |
+          SEPARATOR="?"
+          case "${AUTOMATION_URL}" in *\?*) SEPARATOR="&" ;; esac
+          curl --fail --show-error --silent \
+            --request POST \
+            --header "Authorization: Bearer ${AUTOMATION_SECRET}" \
+            "${AUTOMATION_URL}${SEPARATOR}slot=morning&target_date=2026-07-17&dry_run=true"
