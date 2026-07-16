@@ -39,6 +39,7 @@ jobs:
           SCHEDULE: ${{ github.event.schedule }}
           MANUAL_SLOT: ${{ inputs.slot }}
           TARGET_DATE: ${{ inputs.target_date }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           case "${SCHEDULE}" in
             "58 20 * * *"|"0 21 * * *") SLOT="morning" ;;
@@ -49,11 +50,14 @@ jobs:
           esac
           # The July 17 morning story was recovered manually after the first-run failure.
           # Skip any delayed copy of the original 06:00 event to prevent duplication.
-          if [ "${SLOT}" = "morning" ] && [ "$(TZ=Asia/Tokyo date +%F)" = "2026-07-17" ]; then
+          if [ "${EVENT_NAME}" = "schedule" ] && [ "${SLOT}" = "morning" ] && [ "$(TZ=Asia/Tokyo date +%F)" = "2026-07-17" ]; then
             echo "July 17 morning story already recovered; skipping delayed event."
             exit 0
           fi
           QUERY="slot=${SLOT}"
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            QUERY="${QUERY}&force=true"
+          fi
           if [ -n "${TARGET_DATE}" ]; then
             QUERY="${QUERY}&target_date=${TARGET_DATE}"
           fi
