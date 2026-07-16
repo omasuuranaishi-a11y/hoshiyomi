@@ -1,0 +1,26 @@
+name: Daily Instagram Story
+
+on:
+  schedule:
+    # 22:00 UTC = 07:00 JST（翌日）
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: daily-instagram-story
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Generate and publish today's story
+        env:
+          AUTOMATION_URL: ${{ secrets.AUTOMATION_URL }}
+          AUTOMATION_SECRET: ${{ secrets.AUTOMATION_SECRET }}
+        run: |
+          curl --fail --show-error --silent \
+            --request POST \
+            --header "Authorization: Bearer ${AUTOMATION_SECRET}" \
+            "${AUTOMATION_URL}"
