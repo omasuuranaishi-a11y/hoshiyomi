@@ -2,7 +2,7 @@ name: Four Daily Instagram Stories
 
 on:
   schedule:
-    - cron: "0 21 * * *"   # 06:00 JST
+    - cron: "58 20 * * *"  # start 05:58 JST; publish around 06:00
     - cron: "15 3 * * *"   # 12:15 JST
     - cron: "30 9 * * *"   # 18:30 JST
     - cron: "30 12 * * *"  # 21:30 JST
@@ -41,12 +41,18 @@ jobs:
           TARGET_DATE: ${{ inputs.target_date }}
         run: |
           case "${SCHEDULE}" in
-            "0 21 * * *") SLOT="morning" ;;
+            "58 20 * * *"|"0 21 * * *") SLOT="morning" ;;
             "15 3 * * *") SLOT="noon" ;;
             "30 9 * * *") SLOT="evening" ;;
             "30 12 * * *") SLOT="night" ;;
             *) SLOT="${MANUAL_SLOT:-morning}" ;;
           esac
+          # The July 17 morning story was recovered manually after the first-run failure.
+          # Skip any delayed copy of the original 06:00 event to prevent duplication.
+          if [ "${SLOT}" = "morning" ] && [ "$(TZ=Asia/Tokyo date +%F)" = "2026-07-17" ]; then
+            echo "July 17 morning story already recovered; skipping delayed event."
+            exit 0
+          fi
           QUERY="slot=${SLOT}"
           if [ -n "${TARGET_DATE}" ]; then
             QUERY="${QUERY}&target_date=${TARGET_DATE}"

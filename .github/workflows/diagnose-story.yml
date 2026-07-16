@@ -1,7 +1,6 @@
 name: Recover Morning Story
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 jobs:
   publish-morning:
     runs-on: ubuntu-latest
