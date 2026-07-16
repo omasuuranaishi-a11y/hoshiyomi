@@ -24,10 +24,15 @@ class InstagramPublisher:
     ) -> None:
         self.user_id = user_id or os.getenv("INSTAGRAM_USER_ID", "").strip()
         self.access_token = access_token or os.getenv("INSTAGRAM_ACCESS_TOKEN", "").strip()
-        self.graph_base_url = (
+        configured_graph_url = (
             graph_base_url
-            or os.getenv("INSTAGRAM_GRAPH_BASE_URL", "https://graph.instagram.com")
+            or os.getenv("INSTAGRAM_GRAPH_BASE_URL", "https://graph.facebook.com")
         ).rstrip("/")
+        # This service uses Facebook Login + a Page access token for a connected
+        # Instagram business account. That flow publishes through graph.facebook.com.
+        if configured_graph_url == "https://graph.instagram.com":
+            configured_graph_url = "https://graph.facebook.com"
+        self.graph_base_url = configured_graph_url
         self.api_version = api_version or os.getenv("INSTAGRAM_API_VERSION", "v25.0")
         self.client = client or httpx.Client(timeout=60, follow_redirects=True)
 

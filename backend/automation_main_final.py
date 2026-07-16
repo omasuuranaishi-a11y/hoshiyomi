@@ -56,5 +56,5 @@ def daily_story_automation(
         raise HTTPException(status_code=400, detail="日付の形式を確認してください。") from exc
     except Exception as exc:
         logging.exception("Daily Story automation failed")
-        raise HTTPException(status_code=503, detail="ストーリー自動投稿に失敗しました。") from exc
+        raise HTTPException(status_code=503, detail=f"{type(exc).__name__}: {str(exc)[:300]}") from exc
     return JSONResponse(result)
