@@ -1,9 +1,7 @@
 name: Daily Instagram Story
 
 on:
-  schedule:
-    # 21:00 UTC = 06:00 JST (next day)
-    - cron: "0 21 * * *"
+  # Paused while the visual template is being upgraded.
   workflow_dispatch:
 
 concurrency:
