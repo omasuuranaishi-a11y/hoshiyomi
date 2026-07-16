@@ -2,8 +2,8 @@ name: Daily Instagram Story
 
 on:
   schedule:
-    # 22:00 UTC = 07:00 JST（翌日）
-    - cron: "0 22 * * *"
+    # 21:00 UTC = 06:00 JST (next day)
+    - cron: "0 21 * * *"
   workflow_dispatch:
 
 concurrency:
