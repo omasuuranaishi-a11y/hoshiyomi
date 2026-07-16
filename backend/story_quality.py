@@ -14,6 +14,51 @@ REFERENCE = ROOT / "assets" / "reference"
 FONT_DIR = ROOT / "assets" / "fonts"
 PAPER=(249,245,235); INK=(14,39,64); NAVY=(4,44,73); JADE=(24,119,117)
 CORAL=(235,111,86); GOLD=(181,139,70); WHITE=(255,253,247); MUTED=(91,91,85)
+THEMES = (
+    ("珊瑚の朝", (238,119,92), (21,102,96), (186,145,73)),
+    ("翡翠の庭", (43,126,111), (231,128,98), (197,161,91)),
+    ("藍の星空", (15,58,88), (205,153,106), (228,190,113)),
+    ("藤の余韻", (142,121,164), (54,112,105), (211,157,105)),
+    ("金色の暦", (195,151,72), (25,91,83), (226,117,87)),
+    ("水明の青", (68,122,145), (222,132,103), (178,152,102)),
+    ("茜の宵", (166,76,78), (33,83,91), (216,166,101)),
+)
+SLOT_OFFSETS={"morning":0,"noon":2,"evening":4,"night":6}
+
+def design_variant(day:date,slot:str)->dict[str,Any]:
+    index=(day.toordinal()+SLOT_OFFSETS[slot])%len(THEMES)
+    name,primary,secondary,gold=THEMES[index]
+    return {"index":index,"name":name,"primary":primary,"secondary":secondary,"gold":gold}
+
+def _decorate(im:Image.Image,day:date,slot:str)->Image.Image:
+    theme=design_variant(day,slot);primary=theme["primary"];secondary=theme["secondary"];gold=theme["gold"]
+    im=Image.blend(im,Image.new("RGB",im.size,primary),0.035)
+    d=ImageDraw.Draw(im,"RGBA");v=theme["index"]
+    if v==0:
+        d.line((30,35,1050,35),fill=(*gold,190),width=3);d.line((30,1885,1050,1885),fill=(*gold,190),width=3)
+    elif v==1:
+        for x,y in ((70,120),(1000,230),(950,1740),(120,1810)):
+            d.ellipse((x-6,y-6,x+6,y+6),fill=(*gold,220));d.line((x-18,y,x+18,y),fill=(*gold,180),width=2);d.line((x,y-18,x,y+18),fill=(*gold,180),width=2)
+    elif v==2:
+        d.arc((-120,1380,360,1940),270,70,fill=(*secondary,190),width=6)
+        for i in range(6):
+            y=1580+i*45;d.ellipse((55+i*16,y,105+i*16,y+25),fill=(*secondary,120))
+    elif v==3:
+        d.arc((750,-180,1220,390),80,220,fill=(*primary,180),width=8)
+        for i in range(7):d.ellipse((865+i*24,115+i*9,873+i*24,123+i*9),fill=(*gold,200))
+    elif v==4:
+        d.polygon(((0,0),(190,0),(110,155),(0,210)),fill=(*primary,75));d.polygon(((1080,1920),(850,1920),(930,1755),(1080,1690)),fill=(*secondary,70))
+    elif v==5:
+        points=((70,220),(115,180),(155,245),(205,205),(250,270));d.line(points,fill=(*gold,180),width=2)
+        for x,y in points:d.ellipse((x-5,y-5,x+5,y+5),fill=(*gold,220))
+    else:
+        import math
+        cx,cy=970,145
+        for angle in range(0,360,30):
+            x2=cx+int(62*math.cos(math.radians(angle)));y2=cy+int(62*math.sin(math.radians(angle)));d.line((cx,cy,x2,y2),fill=(*gold,145),width=2)
+        d.ellipse((cx-22,cy-22,cx+22,cy+22),fill=(*gold,120))
+    return im
+
 
 def _font_path() -> str:
     candidates: Iterable[Path | str] = (
@@ -154,7 +199,7 @@ def _render_night(c:dict[str,Any],day:date)->Image.Image:
 
 def render_approved_story(content:dict[str,Any],day:date,output_path:str|Path)->Path:
     renderer={"morning":_render_morning,"noon":_render_noon,"evening":_render_evening,"night":_render_night}[content["slot"]]
-    image=renderer(content,day)
+    image=_decorate(renderer(content,day),day,content["slot"])
     if image.size!=(WIDTH,HEIGHT): raise RuntimeError("Story must be exactly 1080x1920")
     path=Path(output_path); path.parent.mkdir(parents=True,exist_ok=True)
     image.save(path,"JPEG",quality=96,optimize=True,subsampling=0)

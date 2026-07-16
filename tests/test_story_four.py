@@ -1,5 +1,6 @@
 from datetime import date,timedelta
 from backend.story_four import SLOTS,build_slot_content,render_slot_story,solar_term
+from backend.story_quality import design_variant
 
 def facts(day=date(2026,7,17)):
     moon_degree=(day.toordinal()*13.176)%30
@@ -23,3 +24,9 @@ def test_content_never_repeats_for_sample_period():
         signature=tuple(str(build_slot_content(facts(day),s)) for s in SLOTS)
         assert signature not in seen
         seen.add(signature)
+
+def test_seven_designs_rotate_without_consecutive_repeats():
+    for slot in SLOTS:
+        names=[design_variant(date(2026,7,17)+timedelta(days=i),slot)["name"] for i in range(7)]
+        assert len(set(names))==7
+        assert all(left!=right for left,right in zip(names,names[1:]))
