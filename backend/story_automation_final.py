@@ -17,7 +17,7 @@ from .story_automation import (
     _write_json,
 )
 from .story_copy import DailyStoryCopy, generate_story_copy
-from .story_renderer_final import render_story_images
+from .story_renderer_premium import render_story_images
 from .story_sky_daily import build_daily_sky
 
 
@@ -54,6 +54,7 @@ def run_daily_story(
     paths = render_story_images(
         copy,
         target,
+        facts=facts,
         output_root=generated / "story_assets",
     )
     urls = _asset_urls(target, len(paths))
