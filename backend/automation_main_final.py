@@ -11,7 +11,7 @@ from fastapi import Header, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
 from .main import app
-from .story_automation_final import run_daily_story
+from .story_automation_four import run_story_slot
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def story_asset(target_date: str, filename: str) -> FileResponse:
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", target_date):
         raise HTTPException(status_code=404, detail="not found")
-    if not re.fullmatch(r"slide-[1-3]\.jpg", filename):
+    if not re.fullmatch(r"(?:morning|noon|evening|night)\.jpg", filename):
         raise HTTPException(status_code=404, detail="not found")
     asset = ROOT / "generated" / "story_assets" / target_date / filename
     if not asset.is_file():
@@ -36,8 +36,8 @@ def story_asset(target_date: str, filename: str) -> FileResponse:
 @app.post("/api/automation/daily-story")
 def daily_story_automation(
     target_date: str | None = None,
+    slot: str = "morning",
     dry_run: bool = False,
-    offline: bool = False,
     force: bool = False,
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
 ) -> JSONResponse:
@@ -46,10 +46,10 @@ def daily_story_automation(
     if not expected or not received or not secrets.compare_digest(expected, received):
         raise HTTPException(status_code=401, detail="unauthorized")
     try:
-        result = run_daily_story(
+        result = run_story_slot(
             target_date,
+            slot=slot,
             dry_run=dry_run,
-            offline=offline,
             force=force,
         )
     except ValueError as exc:

@@ -1,8 +1,27 @@
-name: Daily Instagram Story
+name: Four Daily Instagram Stories
 
 on:
-  # Paused while the visual template is being upgraded.
+  schedule:
+    - cron: "0 21 * * *"   # 06:00 JST
+    - cron: "15 3 * * *"   # 12:15 JST
+    - cron: "30 9 * * *"   # 18:30 JST
+    - cron: "30 12 * * *"  # 21:30 JST
   workflow_dispatch:
+    inputs:
+      slot:
+        description: Story slot
+        required: true
+        default: morning
+        type: choice
+        options:
+          - morning
+          - noon
+          - evening
+          - night
+      target_date:
+        description: Optional YYYY-MM-DD in JST
+        required: false
+        type: string
 
 concurrency:
   group: daily-instagram-story
@@ -13,12 +32,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Generate and publish today's story
+      - name: Generate and publish one story
         env:
           AUTOMATION_URL: ${{ secrets.AUTOMATION_URL }}
           AUTOMATION_SECRET: ${{ secrets.AUTOMATION_SECRET }}
+          SCHEDULE: ${{ github.event.schedule }}
+          MANUAL_SLOT: ${{ inputs.slot }}
+          TARGET_DATE: ${{ inputs.target_date }}
         run: |
+          case "${SCHEDULE}" in
+            "0 21 * * *") SLOT="morning" ;;
+            "15 3 * * *") SLOT="noon" ;;
+            "30 9 * * *") SLOT="evening" ;;
+            "30 12 * * *") SLOT="night" ;;
+            *) SLOT="${MANUAL_SLOT:-morning}" ;;
+          esac
+          QUERY="slot=${SLOT}"
+          if [ -n "${TARGET_DATE}" ]; then
+            QUERY="${QUERY}&target_date=${TARGET_DATE}"
+          fi
+          SEPARATOR="?"
+          case "${AUTOMATION_URL}" in *\?*) SEPARATOR="&" ;; esac
           curl --fail --show-error --silent \
             --request POST \
             --header "Authorization: Bearer ${AUTOMATION_SECRET}" \
-            "${AUTOMATION_URL}"
+            "${AUTOMATION_URL}${SEPARATOR}${QUERY}"
