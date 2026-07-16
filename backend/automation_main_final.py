@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 import re
@@ -54,5 +55,6 @@ def daily_story_automation(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="日付の形式を確認してください。") from exc
     except Exception as exc:
+        logging.exception("Daily Story automation failed")
         raise HTTPException(status_code=503, detail="ストーリー自動投稿に失敗しました。") from exc
     return JSONResponse(result)
