@@ -73,4 +73,5 @@ def _night(d,c,day,fp):
     for p in c["paragraphs"]:y=_text(d,(92,y),p,_font(fp,31),width=895,gap=12)+28
     top=min(y+12,1640);d.rounded_rectangle((80,top,1000,min(top+130,1770)),8,outline=NAVY,width=2);f=_font(fp,34);d.text(((WIDTH-d.textlength(c["ending"],font=f))/2,min(y+48,1675)),c["ending"],font=f,fill=NAVY);_footer(d,fp)
 def render_slot_story(content,day,output_path):
-    image=Image.new("RGB",(WIDTH,HEIGHT),PAPER);draw=ImageDraw.Draw(image);fp=resolve_font_path();{"morning":_morning,"noon":_noon,"evening":_evening,"night":_night}[content["slot"]](draw,content,day,fp);path=Path(output_path);path.parent.mkdir(parents=True,exist_ok=True);image.save(path,"JPEG",quality=94,optimize=True,subsampling=0);return path
+    from .story_quality import render_approved_story
+    return render_approved_story(content,day,output_path)

@@ -11,7 +11,10 @@ def test_four_slots_render(tmp_path):
     assert solar_term(facts(day))=="小暑"
     for item in items:
         path=render_slot_story(item,day,tmp_path/f"{item['slot']}.jpg")
-        assert path.stat().st_size>50000
+        assert path.stat().st_size>150000
+        from PIL import Image
+        with Image.open(path) as image:
+            assert image.size == (1080, 1920)
 
 def test_content_never_repeats_for_sample_period():
     seen=set()

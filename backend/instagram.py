@@ -122,7 +122,30 @@ class InstagramPublisher:
             raise InstagramAPIError("公開後のInstagramメディアIDを取得できませんでした。")
         return str(media_id)
 
+    def verify_published(self, media_id: str, *, attempts: int = 5) -> bool:
+        """Best-effort confirmation after Meta returns a published media id."""
+        last_error = "not visible"
+        for attempt in range(attempts):
+            try:
+                response = self.client.get(
+                    self._url(media_id),
+                    headers=self._headers,
+                    params={"fields": "id,media_type,timestamp"},
+                )
+                self._raise_for_error(response)
+                body = self._body(response)
+                if str(body.get("id")) == str(media_id):
+                    return
+                last_error = "media id did not match"
+            except Exception as exc:
+                last_error = str(exc)
+            if attempt < attempts - 1:
+                time.sleep(2)
+        return False
+
     def publish_story(self, image_url: str) -> str:
         container_id = self.create_story_container(image_url)
         self.wait_until_ready(container_id)
-        return self.publish_container(container_id)
+        media_id = self.publish_container(container_id)
+        self.verify_published(media_id)
+        return media_id
