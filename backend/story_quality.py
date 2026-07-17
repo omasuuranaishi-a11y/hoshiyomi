@@ -144,6 +144,22 @@ def _render_morning(c:dict[str,Any],day:date)->Image.Image:
     return im
 
 def _render_noon(c:dict[str,Any],day:date)->Image.Image:
+    # High-resolution user-approved collage master. Only the daily copy changes.
+    im=_master("noon-approved-hd.png");d=ImageDraw.Draw(im)
+    cards=(
+        ((105,875,500,1015),"火",(218,77,58)),
+        ((580,875,975,1015),"地",(40,103,76)),
+        ((105,1480,500,1625),"風",(119,101,148)),
+        ((580,1480,975,1625),"水",(180,54,77)),
+    )
+    for box,key,color in cards:
+        x1,y1,x2,y2=box
+        d.rectangle(box,fill=(249,241,226))
+        _fit(d,c["actions"][key],(x1+12,y1+8,x2-12,y2-24),max_size=43,min_size=29,align="center")
+        d.line((x1+35,y2-15,x2-35,y2-15),fill=color,width=3)
+    d.rounded_rectangle((80,1680,1000,1808),radius=14,fill=(250,244,231))
+    _fit(d,f"今日のヒント｜{c['footer']}",(115,1710,965,1785),max_size=30,min_size=22,align="center")
+    return im
     im=Image.new("RGB",(WIDTH,HEIGHT),PAPER); d=ImageDraw.Draw(im)
     d.rounded_rectangle((28,28,1052,1892),radius=62,fill=(251,244,229),outline=GOLD,width=2)
     d.polygon(((28,28),(360,28),(250,255),(28,330)),fill=CORAL)
