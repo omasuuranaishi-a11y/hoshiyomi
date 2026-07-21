@@ -16,6 +16,9 @@ REFERENCE = ROOT / "assets" / "reference"
 FONT_DIR = ROOT / "assets" / "fonts"
 PAPER=(249,245,235); INK=(14,39,64); NAVY=(4,44,73); JADE=(24,119,117)
 CORAL=(235,111,86); GOLD=(181,139,70); WHITE=(255,253,247); MUTED=(91,91,85)
+MOBILE_BODY_MIN = 34
+MOBILE_SUPPORT_MIN = 28
+MORNING_BODY_MIN = 38
 THEMES = (
     ("珊瑚の朝", (238,119,92), (21,102,96), (186,145,73)),
     ("翡翠の庭", (43,126,111), (231,128,98), (197,161,91)),
@@ -35,29 +38,58 @@ def design_variant(day:date,slot:str)->dict[str,Any]:
     name,primary,secondary,gold=THEMES[palette_index]
     return {"index":palette_index,"motif_index":motif_index,"name":f"{name} / {MOTIFS[motif_index]}","primary":primary,"secondary":secondary,"gold":gold}
 
+def _mix_color(left:tuple[int,int,int],right:tuple[int,int,int],amount:float)->tuple[int,int,int]:
+    return tuple(round(a+(b-a)*amount) for a,b in zip(left,right))
+
 def _decorate(im:Image.Image,day:date,slot:str)->Image.Image:
     theme=design_variant(day,slot);primary=theme["primary"];secondary=theme["secondary"];gold=theme["gold"]
-    im=Image.blend(im,Image.new("RGB",im.size,primary),0.035)
+    if slot=="night":
+        # Preserve the approved column design: only the former, restrained
+        # daily tint and edge motif are applied. Text is enlarged separately.
+        im=Image.blend(im,Image.new("RGB",im.size,primary),0.035)
+        d=ImageDraw.Draw(im,"RGBA");v=theme["motif_index"]
+        if v==0:
+            d.line((30,122,1050,122),fill=(*gold,190),width=3);d.line((30,1715,1050,1715),fill=(*gold,150),width=3)
+        elif v==1:
+            for x,y in ((28,230),(1052,260),(28,1390),(1052,1580)):
+                d.ellipse((x-6,y-6,x+6,y+6),fill=(*gold,220));d.line((x-18,y,x+18,y),fill=(*gold,180),width=2);d.line((x,y-18,x,y+18),fill=(*gold,180),width=2)
+        elif v==2:
+            d.arc((-260,1180,110,1680),270,70,fill=(*secondary,190),width=6)
+            for i in range(6):
+                y=1375+i*42;d.ellipse((8+i*6,y,48+i*6,y+21),fill=(*secondary,120))
+        else:
+            d.polygon(((0,0),(125,0),(78,105),(0,145)),fill=(*primary,75));d.polygon(((1080,1920),(930,1920),(985,1795),(1080,1740)),fill=(*secondary,70))
+        return im
+    # The former 3.5% tint was effectively invisible on a phone. Keep the
+    # approved masters, but make the rotating palette and motif unmistakable.
+    im=Image.blend(im,Image.new("RGB",im.size,primary),0.075)
     d=ImageDraw.Draw(im,"RGBA");v=theme["motif_index"]
+    d.rounded_rectangle((18,18,1062,1902),radius=42,outline=(*primary,185),width=5)
     if v==0:
-        d.line((30,122,1050,122),fill=(*gold,190),width=3);d.line((30,1715,1050,1715),fill=(*gold,150),width=3)
+        d.line((34,122,1046,122),fill=(*gold,220),width=5);d.line((34,1715,1046,1715),fill=(*gold,190),width=5)
+        d.rounded_rectangle((26,250,42,1610),radius=8,fill=(*secondary,170))
     elif v==1:
         for x,y in ((28,230),(1052,260),(28,1390),(1052,1580)):
-            d.ellipse((x-6,y-6,x+6,y+6),fill=(*gold,220));d.line((x-18,y,x+18,y),fill=(*gold,180),width=2);d.line((x,y-18,x,y+18),fill=(*gold,180),width=2)
+            d.ellipse((x-8,y-8,x+8,y+8),fill=(*gold,235));d.line((x-24,y,x+24,y),fill=(*gold,205),width=3);d.line((x,y-24,x,y+24),fill=(*gold,205),width=3)
+        for offset in range(7):
+            x=55+offset*155; y=1740+(offset%2)*18
+            d.ellipse((x-4,y-4,x+4,y+4),fill=(*primary,210))
     elif v==2:
-        d.arc((-260,1180,110,1680),270,70,fill=(*secondary,190),width=6)
+        d.arc((-260,1160,120,1690),270,70,fill=(*secondary,225),width=10)
         for i in range(6):
-            y=1375+i*42;d.ellipse((8+i*6,y,48+i*6,y+21),fill=(*secondary,120))
+            y=1365+i*44;d.ellipse((8+i*6,y,52+i*6,y+23),fill=(*secondary,165))
+        d.arc((918,165,1115,405),80,270,fill=(*gold,190),width=7)
     else:
-        d.polygon(((0,0),(125,0),(78,105),(0,145)),fill=(*primary,75));d.polygon(((1080,1920),(930,1920),(985,1795),(1080,1740)),fill=(*secondary,70))
+        d.polygon(((0,0),(185,0),(112,142),(0,205)),fill=(*primary,115));d.polygon(((1080,1920),(860,1920),(970,1740),(1080,1675)),fill=(*secondary,110))
+        d.line((50,178,50,410),fill=(*gold,210),width=5);d.line((1030,1510,1030,1740),fill=(*gold,210),width=5)
     return im
 
 def _regions_for_slot(slot:str)->list[tuple[str,tuple[int,int,int,int]]]:
     regions={
-        "morning":[("date",(265,335,815,456)),("solar_term",(145,630,720,712)),("season_note",(145,766,720,825)),("moon_phase",(135,1085,735,1150)),("moon_line",(135,1191,735,1275)),("daily_hint",(195,1445,900,1570)),("daily_question",(188,1597,905,1663))],
-        "noon":[("fire_action",(117,883,488,991)),("earth_action",(592,883,963,991)),("air_action",(117,1488,488,1601)),("water_action",(592,1488,963,1601)),("noon_footer",(115,1637,965,1677))],
-        "evening":[("evening_headline",(365,438,955,500)),("sky_state",(440,684,930,805)),("mind_tendency",(440,952,930,1070)),("maintenance_actions",(465,1282,915,1458)),("evening_footer",(275,1505,1010,1652))],
-        "night":[("night_headline",(95,345,985,425)),("night_body",(125,515,955,1485)),("night_ending",(145,1535,935,1638))],
+        "morning":[("date",(265,335,815,456)),("solar_term",(130,630,755,712)),("season_note",(130,750,755,840)),("moon_phase",(120,1085,750,1158)),("moon_line",(120,1170,750,1315)),("daily_hint",(195,1445,900,1570)),("daily_question",(188,1597,905,1663))],
+        "noon":[("fire_action",(117,883,488,991)),("earth_action",(592,883,963,991)),("air_action",(117,1488,488,1601)),("water_action",(592,1488,963,1601)),("noon_footer",(115,1625,965,1680))],
+        "evening":[("evening_headline",(365,438,955,500)),("sky_state",(380,674,960,835)),("mind_tendency",(380,940,960,1095)),("maintenance_actions",(400,1270,955,1470)),("evening_footer",(275,1505,1010,1652))],
+        "night":[("column_headline",(105,400,975,680)),("column_body",(105,975,975,1575)),("column_ending",(120,1590,960,1680))],
     }
     if slot not in regions:raise ValueError(f"Unknown story slot: {slot}")
     return regions[slot]
@@ -139,33 +171,36 @@ def _date_text(day):
 def _render_morning(c:dict[str,Any],day:date)->Image.Image:
     validate_layout_regions("morning")
     im=_master("morning-approved.png"); d=ImageDraw.Draw(im)
-    _box(d,(265,335,815,456),(249,245,234)); _center(d,_date_text(day),367,38,left=250,right=830)
+    theme=design_variant(day,"morning"); primary=theme["primary"]; secondary=theme["secondary"]; gold=theme["gold"]
+    dark_primary=_mix_color(NAVY,primary,0.35)
+    _box(d,(245,325,835,466),(249,245,234)); _center(d,_date_text(day),360,48,left=230,right=850)
     for x in range(320,760,10): d.ellipse((x,438,x+3,441),fill=INK)
-    _center(d,"✶",420,22,fill=GOLD)
-    _box(d,(130,615,725,824),(250,247,238))
-    _fit(d,f"二十四節気｜{c['term']}",(145,630,720,712),max_size=47)
-    d.line((145,738,660,738),fill=JADE,width=2)
-    _fit(d,"季節の変化を、暮らしの小さな目印に。",(145,766,720,825),max_size=27,min_size=23)
-    _box(d,(777,540,916,720),(247,243,231))
-    _center(d,day.strftime("%B").upper(),550,20,fill=(51,97,73),left=770,right=925)
-    _center(d,str(day.day),590,62,fill=(51,97,73),left=770,right=925)
-    _center(d,day.strftime("%a").upper(),667,23,fill=(51,97,73),left=770,right=925)
-    d.rounded_rectangle((112,1070,744,1283),radius=12,fill=NAVY)
-    _fit(d,f"{c['phase']}｜明るさ {c['illumination']:.1f}%",(135,1085,735,1150),max_size=33,min_size=26,fill=WHITE)
-    d.line((135,1170,690,1170),fill=GOLD,width=2)
-    _fit(d,c["moon_line"],(135,1191,735,1275),max_size=28,min_size=23,fill=WHITE)
+    d.ellipse((536,438,544,446),fill=GOLD)
+    _box(d,(115,615,765,840),(250,247,238))
+    _fit(d,f"二十四節気｜{c['term']}",(130,630,755,712),max_size=47)
+    d.line((130,738,720,738),fill=primary,width=3)
+    _fit(d,"季節の変化を、暮らしの目印に。",(130,750,755,840),max_size=40,min_size=38,line_gap=.24)
+    _box(d,(770,530,925,780),(247,243,231))
+    _center(d,day.strftime("%B").upper(),552,24,fill=(51,97,73),left=770,right=925)
+    _center(d,str(day.day),610,62,fill=(51,97,73),left=770,right=925)
+    _center(d,day.strftime("%a").upper(),690,26,fill=(51,97,73),left=770,right=925)
+    d.rounded_rectangle((102,1070,758,1325),radius=12,fill=dark_primary)
+    _fit(d,f"{c['phase']}｜{c['illumination']:.1f}%",(120,1085,750,1158),max_size=42,min_size=MORNING_BODY_MIN,fill=WHITE)
+    d.line((120,1168,720,1168),fill=gold,width=3)
+    _fit(d,c["moon_line"],(120,1170,750,1315),max_size=42,min_size=MORNING_BODY_MIN,fill=WHITE,line_gap=.30)
     _box(d,(165,1430,925,1580),(250,247,238))
-    _fit(d,c["hint"],(195,1445,900,1570),max_size=43,min_size=31,align="center")
-    d.rounded_rectangle((130,1580,950,1775),radius=24,fill=(250,247,238),outline=CORAL,width=2)
-    d.line((220,1705,860,1705),fill=CORAL,width=2)
+    _fit(d,c["hint"],(195,1445,900,1570),max_size=44,min_size=36,align="center",line_gap=.32)
+    d.rounded_rectangle((130,1580,950,1775),radius=24,fill=(250,247,238),outline=secondary,width=3)
+    d.line((220,1705,860,1705),fill=secondary,width=3)
     _box(d,(170,1588,920,1670),(250,247,238))
-    _fit(d,f"今日の問い｜{c['question']}",(188,1597,905,1663),max_size=27,min_size=22,align="center")
+    _fit(d,f"今日の問い｜{c['question']}",(188,1597,905,1663),max_size=38,min_size=32,align="center",line_gap=.30)
     return im
 
 def _render_noon(c:dict[str,Any],day:date)->Image.Image:
     validate_layout_regions("noon")
     # High-resolution user-approved collage master. Only the daily copy changes.
     im=_master("noon-approved-hd.png");d=ImageDraw.Draw(im)
+    theme=design_variant(day,"noon"); primary=theme["primary"]; secondary=theme["secondary"]; gold=theme["gold"]
     cards=(
         ((105,875,500,1015),"火",(218,77,58)),
         ((580,875,975,1015),"地",(40,103,76)),
@@ -175,12 +210,12 @@ def _render_noon(c:dict[str,Any],day:date)->Image.Image:
     for box,key,color in cards:
         x1,y1,x2,y2=box
         d.rectangle(box,fill=(249,241,226))
-        _fit(d,c["actions"][key],(x1+12,y1+8,x2-12,y2-24),max_size=43,min_size=29,align="center")
+        _fit(d,c["actions"][key],(x1+12,y1+6,x2-12,y2-10),max_size=42,min_size=MOBILE_BODY_MIN,align="center",line_gap=.28)
         d.line((x1+35,y2-15,x2-35,y2-15),fill=color,width=3)
-    d.rounded_rectangle((65,1615,1015,1815),radius=24,fill=(250,244,231),outline=GOLD,width=2)
-    d.line((200,1720,880,1720),fill=GOLD,width=2)
+    d.rounded_rectangle((65,1615,1015,1815),radius=24,fill=_mix_color((250,244,231),primary,0.10),outline=gold,width=3)
+    d.line((200,1720,880,1720),fill=gold,width=3)
     d.rounded_rectangle((80,1628,1000,1690),radius=14,fill=(250,244,231))
-    _fit(d,f"今日のヒント｜{c['footer']}",(115,1637,965,1677),max_size=27,min_size=20,align="center")
+    _fit(d,c["footer"],(115,1625,965,1680),max_size=35,min_size=30,align="center",line_gap=.26)
     return im
     im=Image.new("RGB",(WIDTH,HEIGHT),PAPER); d=ImageDraw.Draw(im)
     d.rounded_rectangle((28,28,1052,1892),radius=62,fill=(251,244,229),outline=GOLD,width=2)
@@ -208,40 +243,46 @@ def _render_noon(c:dict[str,Any],day:date)->Image.Image:
 def _render_evening(c:dict[str,Any],day:date)->Image.Image:
     validate_layout_regions("evening")
     im=_master("evening-approved.png"); d=ImageDraw.Draw(im)
-    _box(d,(805,42,1028,102),(249,245,235)); _fit(d,_date_text(day),(805,48,1025,90),max_size=18,min_size=16,align="center")
-    d.rounded_rectangle((338,425,982,511),radius=10,fill=JADE)
+    theme=design_variant(day,"evening"); primary=theme["primary"]; secondary=theme["secondary"]; gold=theme["gold"]
+    dark_primary=_mix_color(NAVY,primary,0.35)
+    _box(d,(790,38,1035,108),(249,245,235)); _fit(d,_date_text(day),(795,45,1030,100),max_size=30,min_size=28,align="center")
+    d.rounded_rectangle((338,425,982,511),radius=10,fill=primary)
     _fit(d,c["headline"],(365,438,955,500),max_size=37,min_size=28,fill=WHITE,align="center")
     _box(d,(420,570,1020,820),(249,245,235))
     _box(d,(420,835,1020,1095),(249,245,235))
     _box(d,(410,1135,1000,1475),(250,247,239))
-    _box(d,(430,586,955,755),(249,245,235)); _fit(d,"星の状態",(430,590,930,646),max_size=35)
-    d.line((430,660,940,660),fill=NAVY,width=2)
-    _fit(d,f"{c['sky']}｜{c['context']}",(440,684,930,805),max_size=25,min_size=18)
-    _box(d,(430,850,955,1080),(249,245,235)); _fit(d,"心の傾向",(430,854,930,910),max_size=35)
-    d.line((430,926,940,926),fill=NAVY,width=2)
-    _fit(d,f"{c['tendency']}。\n{c['adjust']}。",(440,952,930,1070),max_size=26,min_size=21)
-    _box(d,(430,1190,940,1450),(250,247,239)); _fit(d,"今夜の3分メンテ",(430,1192,910,1250),max_size=34,fill=JADE)
-    y=1282
+    _box(d,(365,580,975,840),(249,245,235)); _fit(d,"星の状態",(380,590,950,646),max_size=37,min_size=34)
+    d.line((380,660,960,660),fill=gold,width=3)
+    _fit(d,f"{c['sky']}｜{c['context']}",(380,674,960,835),max_size=37,min_size=MOBILE_BODY_MIN,line_gap=.28)
+    _box(d,(365,840,975,1110),(249,245,235)); _fit(d,"心の傾向",(380,850,950,910),max_size=37,min_size=34)
+    d.line((380,926,960,926),fill=gold,width=3)
+    _fit(d,f"{c['tendency']}。\n{c['adjust']}。",(380,940,960,1095),max_size=37,min_size=MOBILE_BODY_MIN,line_gap=.28)
+    _box(d,(365,1180,975,1475),(250,247,239)); _fit(d,"今夜の3分メンテ",(380,1190,950,1250),max_size=37,min_size=34,fill=primary)
+    y=1270
     for action in c["actions"]:
-        d.ellipse((438,y+12,449,y+23),fill=(208,157,113))
-        _fit(d,action,(465,y,915,y+48),max_size=24,min_size=20); y+=64
-    d.rectangle((205,1480,1080,1780),fill=NAVY)
-    _fit(d,c["footer"],(275,1505,1010,1652),max_size=34,min_size=25,fill=WHITE,align="center")
+        d.ellipse((378,y+13,394,y+29),fill=gold)
+        _fit(d,action,(410,y,955,y+58),max_size=36,min_size=32,line_gap=.20); y+=66
+    d.rectangle((205,1480,1080,1780),fill=dark_primary)
+    _fit(d,c["footer"],(275,1505,1010,1652),max_size=40,min_size=34,fill=WHITE,align="center",line_gap=.30)
     return im
 
 def _render_night(c:dict[str,Any],day:date)->Image.Image:
     validate_layout_regions("night")
-    im=_master("night-column-approved.png"); d=ImageDraw.Draw(im)
-    _box(d,(570,180,725,242),(249,246,238)); _center(d,str(c["number"])[-2:],189,22,left=570,right=725)
-    _box(d,(80,330,1000,445),(249,246,238)); _fit(d,c["headline"],(95,345,985,425),max_size=53,min_size=38,align="center")
-    # Clear the whole master-copy region so old master text cannot show through
-    # behind the new ending and appear as an overlap.
-    _box(d,(90,445,995,1765),(249,246,238))
-    _fit(d,"\n\n".join(c["paragraphs"]),(125,515,955,1485),max_size=31,min_size=22,line_gap=.56)
-    _box(d,(125,1520,955,1650),(249,246,238)); d.rectangle((125,1520,955,1650),outline=NAVY,width=2)
-    _fit(d,c["ending"],(145,1535,935,1638),max_size=30,min_size=23,fill=NAVY,align="center")
+    im=_master("morning-column-approved.png"); d=ImageDraw.Draw(im)
+    theme=design_variant(day,"night"); gold=theme["gold"]
+    # Keep the approved paper, brush circle, lunar orbit, and footer. Replace
+    # only the daily headline/copy so the result remains premium and readable.
+    paper=(249,246,238)
+    _box(d,(85,370,995,705),paper)
+    _fit(d,c["headline"],(105,400,975,680),max_size=82,min_size=60,align="center",line_gap=.24)
+    _box(d,(85,940,995,1585),paper)
+    body="\n\n".join(c["paragraphs"])
+    _fit(d,body,(105,975,975,1575),max_size=46,min_size=38,line_gap=.42)
+    d.line((120,1582,960,1582),fill=gold,width=2)
+    _box(d,(80,1570,1000,1760),paper)
+    d.rectangle((115,1588,965,1692),outline=NAVY,width=2)
+    _fit(d,c["ending"],(120,1590,960,1680),max_size=38,min_size=32,fill=NAVY,align="center",line_gap=.22)
     return im
-
 def render_approved_story(content:dict[str,Any],day:date,output_path:str|Path)->Path:
     validate_layout_regions(content["slot"])
     renderer={"morning":_render_morning,"noon":_render_noon,"evening":_render_evening,"night":_render_night}[content["slot"]]
@@ -266,5 +307,9 @@ def validate_story_asset(path:str|Path,content:dict[str,Any],day:date)->dict[str
         "text_fit_checked":True,
         "layout":layout,
         "design":design_variant(day,content["slot"])["name"],
+        "mobile_readability":{
+            "body_min_px":MOBILE_BODY_MIN,
+            "support_min_px":MOBILE_SUPPORT_MIN,
+        },
         "asset_bytes":size,
     }

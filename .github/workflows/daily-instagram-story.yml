@@ -1,4 +1,4 @@
-name: Four Daily Instagram Stories
+name: Three Daily Instagram Stories
 
 on:
   schedule:
@@ -7,15 +7,12 @@ on:
     - cron: "58 20 * * *"  # morning primary: 05:58 JST
     - cron: "8 21 * * *"   # morning backup 1: 06:08 JST
     - cron: "18 21 * * *"  # morning backup 2: 06:18 JST
-    - cron: "15 3 * * *"   # noon primary: 12:15 JST
-    - cron: "25 3 * * *"   # noon backup 1: 12:25 JST
-    - cron: "35 3 * * *"   # noon backup 2: 12:35 JST
+    - cron: "30 0 * * *"   # morning column primary: 09:30 JST
+    - cron: "40 0 * * *"   # morning column backup 1: 09:40 JST
+    - cron: "50 0 * * *"   # morning column backup 2: 09:50 JST
     - cron: "30 9 * * *"   # evening primary: 18:30 JST
     - cron: "40 9 * * *"   # evening backup 1: 18:40 JST
     - cron: "50 9 * * *"   # evening backup 2: 18:50 JST
-    - cron: "30 12 * * *"  # night primary: 21:30 JST
-    - cron: "40 12 * * *"  # night backup 1: 21:40 JST
-    - cron: "50 12 * * *"  # night backup 2: 21:50 JST
   workflow_dispatch:
     inputs:
       slot:
@@ -25,9 +22,8 @@ on:
         type: choice
         options:
           - morning
-          - noon
+          - column
           - evening
-          - night
       target_date:
         description: Optional YYYY-MM-DD in JST
         required: false
@@ -53,11 +49,11 @@ jobs:
         run: |
           case "${SCHEDULE}" in
             "58 20 * * *"|"8 21 * * *"|"18 21 * * *"|"0 21 * * *") SLOT="morning" ;;
-            "15 3 * * *"|"25 3 * * *"|"35 3 * * *") SLOT="noon" ;;
+            "30 0 * * *"|"40 0 * * *"|"50 0 * * *") SLOT="night" ;;
             "30 9 * * *"|"40 9 * * *"|"50 9 * * *") SLOT="evening" ;;
-            "30 12 * * *"|"40 12 * * *"|"50 12 * * *") SLOT="night" ;;
             *) SLOT="${MANUAL_SLOT:-morning}" ;;
           esac
+          if [ "${SLOT}" = "column" ]; then SLOT="night"; fi
           # The July 17 morning story was recovered manually after the first-run failure.
           # Skip any delayed copy of the original 06:00 event to prevent duplication.
           if [ "${EVENT_NAME}" = "schedule" ] && [ "${SLOT}" = "morning" ] && [ "$(TZ=Asia/Tokyo date +%F)" = "2026-07-17" ]; then

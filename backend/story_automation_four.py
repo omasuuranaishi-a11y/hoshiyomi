@@ -20,7 +20,7 @@ def run_story_slot(target_date:str|date|None=None,*,slot:str="morning",dry_run:b
     if old and old.get("status")=="published" and not force and not dry_run:
         return {**old,"skipped":True,"reason":"already_published"}
 
-    hour={"morning":6,"noon":12,"evening":18,"night":21}[slot]
+    hour={"morning":6,"noon":12,"evening":18,"night":9}[slot]
     facts=build_daily_sky(target,reading_hour=hour)
     content=build_slot_content(facts,slot)
     content["design_variant"]=design_variant(target,slot)["name"]

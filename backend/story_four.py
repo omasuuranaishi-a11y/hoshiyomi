@@ -40,10 +40,38 @@ def build_slot_content(facts:dict[str,Any],slot:str)->dict[str,Any]:
     if slot=="evening":
         pool=ACTIONS[ELEMENT[moon["sign"]]];acts=[_pick(pool,seed,i+2) for i in range(3)];sky=f"{aspect['planets'][0]}と{aspect['planets'][1]}の{aspect['aspect']}" if aspect else f"{phase['name']}のリズム"
         return dict(slot=slot,title="星よみメンテナンス",headline=f"月が{moon['sign']}にいる夕方",sky=sky,context=context,tendency=tendency,adjust=adjust,actions=acts,footer=f"{moon['sign']}の月は、反省より『調整』に使う。\n明日の自分を助ける夕方に。")
-    headline,practice=ZEN[seed%len(ZEN)];sky=f"今日は{aspect['planets'][0]}と{aspect['planets'][1]}が{aspect['aspect']}。心の中に、二つの声が同時に現れやすい空です。" if aspect else f"今日は{phase['name']}。目に見える変化が少なくても、月は同じ場所に留まりません。"
-    paragraphs=[f"{context}。{tendency}かもしれません。けれど、浮かんだ気持ちをすぐに結論へ運ばなくても大丈夫です。",sky,f"禅の考え方を借りるなら、今夜の整え方は『{practice}』こと。感情を追い払うのではなく、『いま、こう感じている』と気づくだけでいい。","濁った水は、かき混ぜ続けるほど澄むのが遅くなります。考えがまとまらないときは、考える力が足りないのではなく、静かに置く時間が必要なのかもしれません。",f"同じ形のまま留まるものはありません。{adjust}。答えを出さない時間も、心を整える大切な営みです。"]
-    ends=("今夜は、決めないという選択を。","握っていたものを、ひとつだけゆるめて。","今日を直さず、今日のまま眠ろう。","静けさは、余白をつくった場所へ戻ってきます。","足りない一日ではなく、ここまで来た一日に。","明日の答えは、明日の自分に渡していい。")
-    return dict(slot=slot,title="夜の小さなコラム",number=day.toordinal(),headline=headline,context=context,paragraphs=paragraphs,ending=_pick(ends,seed))
+    element=ELEMENT[moon["sign"]]
+    headlines=(
+        "感情は、結論ではない",
+        "反応と選択のあいだ",
+        "迷いは、止まる理由ではない",
+        "整えるとは、減らすこと",
+        "気分と事実を、分けてみる",
+        "小さな違和感を、観察する",
+        "正しさより、選び直せる余白",
+        "考える前に、気づいてみる",
+    )
+    logic={
+        "火":"動きたい気持ちは推進力。ただし、勢いと優先順位は別です。",
+        "地":"整えたい気持ちは安定を求めるサイン。完璧さと必要十分は別です。",
+        "風":"考えが増えるのは視点が動いている証拠。情報量と納得感は別です。",
+        "水":"感情は、守りたいものを知らせる情報。気分と事実は別です。",
+    }
+    practices=(
+        "すぐ反応せず、ひと呼吸おいて観察する。その小さな余白が、今日の選択を整えます。",
+        "答えを急がず、いま起きていることを一度そのまま見る。気づきが、次の一手を静かにします。",
+        "足す前に、ひとつ手放せるものを探す。余白ができると、本当に必要なことが見えてきます。",
+        "良い悪いを決める前に、感情へ名前をつける。それだけで、反応は少し選択に変わります。",
+    )
+    endings=(
+        "今日の視点｜反応の前に、ひと呼吸。",
+        "今日の視点｜気分と事実を、分けてみる。",
+        "今日の視点｜答えより、まず観察を。",
+        "今日の視点｜足す前に、ひとつ減らす。",
+    )
+    astrology=f"月が{moon['sign']}を進む午前は、{tendency}。"
+    paragraphs=[astrology,logic[element],_pick(practices,seed,1)]
+    return dict(slot=slot,title="星と心のミニコラム",number=day.toordinal(),headline=_pick(headlines,seed),context=context,paragraphs=paragraphs,ending=_pick(endings,seed,2))
 
 def _text(d,xy,text,font,fill=INK,width=None,gap=14):
     lines=_wrap_text(d,text,font,width) if width else text.splitlines();x,y=xy
