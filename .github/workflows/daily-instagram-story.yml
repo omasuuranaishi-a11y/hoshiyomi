@@ -2,17 +2,11 @@ name: Three Daily Instagram Stories
 
 on:
   schedule:
-    # Three independent chances per slot. The service skips later attempts
-    # after the first successful publish, so delayed GitHub events do not duplicate.
-    - cron: "58 20 * * *"  # morning primary: 05:58 JST
-    - cron: "8 21 * * *"   # morning backup 1: 06:08 JST
-    - cron: "18 21 * * *"  # morning backup 2: 06:18 JST
-    - cron: "30 0 * * *"   # morning column primary: 09:30 JST
-    - cron: "40 0 * * *"   # morning column backup 1: 09:40 JST
-    - cron: "50 0 * * *"   # morning column backup 2: 09:50 JST
-    - cron: "30 9 * * *"   # evening primary: 18:30 JST
-    - cron: "40 9 * * *"   # evening backup 1: 18:40 JST
-    - cron: "50 9 * * *"   # evening backup 2: 18:50 JST
+    # Start away from the top of the hour, then wait until the exact JST target.
+    # One event per slot prevents duplicate Instagram stories.
+    - cron: "41 20 * * *"  # starts 05:41 JST; publishes at 06:00
+    - cron: "11 0 * * *"   # starts 09:11 JST; publishes at 09:30
+    - cron: "11 9 * * *"   # starts 18:11 JST; publishes at 18:30
   workflow_dispatch:
     inputs:
       slot:
@@ -36,7 +30,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - name: Generate and publish one story
         env:
@@ -48,12 +42,23 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           case "${SCHEDULE}" in
-            "58 20 * * *"|"8 21 * * *"|"18 21 * * *"|"0 21 * * *") SLOT="morning" ;;
-            "30 0 * * *"|"40 0 * * *"|"50 0 * * *") SLOT="night" ;;
-            "30 9 * * *"|"40 9 * * *"|"50 9 * * *") SLOT="evening" ;;
+            "41 20 * * *") SLOT="morning"; PUBLISH_AT="06:00" ;;
+            "11 0 * * *") SLOT="night"; PUBLISH_AT="09:30" ;;
+            "11 9 * * *") SLOT="evening"; PUBLISH_AT="18:30" ;;
             *) SLOT="${MANUAL_SLOT:-morning}" ;;
           esac
           if [ "${SLOT}" = "column" ]; then SLOT="night"; fi
+          if [ "${EVENT_NAME}" = "schedule" ]; then
+            TARGET_EPOCH="$(TZ=Asia/Tokyo date -d "$(TZ=Asia/Tokyo date +%F) ${PUBLISH_AT}:00" +%s)"
+            NOW_EPOCH="$(date +%s)"
+            WAIT_SECONDS="$((TARGET_EPOCH - NOW_EPOCH))"
+            if [ "${WAIT_SECONDS}" -gt 0 ]; then
+              echo "Waiting ${WAIT_SECONDS}s for ${PUBLISH_AT} JST."
+              sleep "${WAIT_SECONDS}"
+            else
+              echo "The scheduler started late; publishing immediately."
+            fi
+          fi
           # The July 17 morning story was recovered manually after the first-run failure.
           # Skip any delayed copy of the original 06:00 event to prevent duplication.
           if [ "${EVENT_NAME}" = "schedule" ] && [ "${SLOT}" = "morning" ] && [ "$(TZ=Asia/Tokyo date +%F)" = "2026-07-17" ]; then
@@ -69,7 +74,9 @@ jobs:
           fi
           SEPARATOR="?"
           case "${AUTOMATION_URL}" in *\?*) SEPARATOR="&" ;; esac
-          curl --fail-with-body --show-error --silent --retry 3 --retry-all-errors --max-time 180 \
+          # Do not retry this POST: an ambiguous network response must never
+          # create a second Instagram story.
+          curl --fail-with-body --show-error --silent --max-time 180 \
             --request POST \
             --header "Authorization: Bearer ${AUTOMATION_SECRET}" \
             "${AUTOMATION_URL}${SEPARATOR}${QUERY}"

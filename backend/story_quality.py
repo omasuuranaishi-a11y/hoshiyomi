@@ -34,19 +34,42 @@ SLOT_OFFSETS={"morning":0,"noon":2,"evening":4,"night":6}
 def design_variant(day:date,slot:str)->dict[str,Any]:
     sequence=day.toordinal()+SLOT_OFFSETS[slot]
     palette_index=sequence%len(THEMES)
-    motif_index=(sequence//len(THEMES)+SLOT_OFFSETS[slot])%len(MOTIFS)
+    motif_index=(sequence*3+SLOT_OFFSETS[slot])%len(MOTIFS)
     name,primary,secondary,gold=THEMES[palette_index]
     return {"index":palette_index,"motif_index":motif_index,"name":f"{name} / {MOTIFS[motif_index]}","primary":primary,"secondary":secondary,"gold":gold}
 
 def _mix_color(left:tuple[int,int,int],right:tuple[int,int,int],amount:float)->tuple[int,int,int]:
     return tuple(round(a+(b-a)*amount) for a,b in zip(left,right))
 
+def _apply_daily_palette(im:Image.Image,day:date,slot:str)->Image.Image:
+    """Recolor the large decorative surfaces so consecutive days look distinct."""
+    theme=design_variant(day,slot)
+    primary=theme["primary"]; secondary=theme["secondary"]; gold=theme["gold"]
+    dark_secondary=_mix_color(NAVY,secondary,.55)
+    overlay=Image.new("RGBA",im.size,(0,0,0,0)); d=ImageDraw.Draw(overlay,"RGBA")
+    if slot=="morning":
+        # These polygons follow the approved collage edges and preserve the
+        # paper texture while changing the dominant palette every day.
+        d.polygon(((0,0),(355,0),(245,285),(0,390)),fill=(*primary,205))
+        d.polygon(((760,0),(1080,0),(1080,405),(910,275)),fill=(*dark_secondary,215))
+        d.polygon(((0,1490),(275,1660),(365,1920),(0,1920)),fill=(*secondary,185))
+        d.polygon(((1080,1450),(845,1680),(755,1920),(1080,1920)),fill=(*_mix_color(primary,gold,.40),175))
+    elif slot=="evening":
+        d.polygon(((0,0),(245,0),(245,1260),(120,1460),(0,1390)),fill=(*dark_secondary,155))
+        d.rectangle((0,1480,1080,1780),fill=(*dark_secondary,200))
+        d.polygon(((880,0),(1080,0),(1080,300),(1000,240)),fill=(*primary,95))
+    elif slot=="night":
+        d.rectangle((0,0,34,1920),fill=(*primary,205))
+        d.polygon(((760,0),(1080,0),(1080,245),(930,165)),fill=(*secondary,60))
+        d.polygon(((0,1700),(150,1775),(230,1920),(0,1920)),fill=(*_mix_color(primary,gold,.35),95))
+    return Image.alpha_composite(im.convert("RGBA"),overlay).convert("RGB")
+
 def _decorate(im:Image.Image,day:date,slot:str)->Image.Image:
     theme=design_variant(day,slot);primary=theme["primary"];secondary=theme["secondary"];gold=theme["gold"]
     if slot=="night":
         # Preserve the approved column design: only the former, restrained
         # daily tint and edge motif are applied. Text is enlarged separately.
-        im=Image.blend(im,Image.new("RGB",im.size,primary),0.035)
+        im=Image.blend(im,Image.new("RGB",im.size,primary),0.055)
         d=ImageDraw.Draw(im,"RGBA");v=theme["motif_index"]
         if v==0:
             d.line((30,122,1050,122),fill=(*gold,190),width=3);d.line((30,1715,1050,1715),fill=(*gold,150),width=3)
@@ -139,7 +162,10 @@ def _wrap(draw, text, font, width):
             lines.append(current); current=""; continue
         trial=current+char
         if current and draw.textlength(trial,font=font)>width:
-            lines.append(current); current=char
+            if char in "\u3001\u3002\uff0c\uff0e\uff01\uff1f\uff09\u300d\u300f\u3011":
+                lines.append(current+char); current=""
+            else:
+                lines.append(current); current=char
         else: current=trial
     if current or not lines: lines.append(current)
     return lines
@@ -170,7 +196,7 @@ def _date_text(day):
 
 def _render_morning(c:dict[str,Any],day:date)->Image.Image:
     validate_layout_regions("morning")
-    im=_master("morning-approved.png"); d=ImageDraw.Draw(im)
+    im=_apply_daily_palette(_master("morning-approved.png"),day,"morning"); d=ImageDraw.Draw(im)
     theme=design_variant(day,"morning"); primary=theme["primary"]; secondary=theme["secondary"]; gold=theme["gold"]
     dark_primary=_mix_color(NAVY,primary,0.35)
     _box(d,(245,325,835,466),(249,245,234)); _center(d,_date_text(day),360,48,left=230,right=850)
@@ -242,7 +268,7 @@ def _render_noon(c:dict[str,Any],day:date)->Image.Image:
 
 def _render_evening(c:dict[str,Any],day:date)->Image.Image:
     validate_layout_regions("evening")
-    im=_master("evening-approved.png"); d=ImageDraw.Draw(im)
+    im=_apply_daily_palette(_master("evening-approved.png"),day,"evening"); d=ImageDraw.Draw(im)
     theme=design_variant(day,"evening"); primary=theme["primary"]; secondary=theme["secondary"]; gold=theme["gold"]
     dark_primary=_mix_color(NAVY,primary,0.35)
     _box(d,(790,38,1035,108),(249,245,235)); _fit(d,_date_text(day),(795,45,1030,100),max_size=30,min_size=28,align="center")
@@ -268,8 +294,8 @@ def _render_evening(c:dict[str,Any],day:date)->Image.Image:
 
 def _render_night(c:dict[str,Any],day:date)->Image.Image:
     validate_layout_regions("night")
-    im=_master("morning-column-approved.png"); d=ImageDraw.Draw(im)
-    theme=design_variant(day,"night"); gold=theme["gold"]
+    im=_apply_daily_palette(_master("morning-column-approved.png"),day,"night"); d=ImageDraw.Draw(im)
+    theme=design_variant(day,"night"); primary=theme["primary"]; gold=theme["gold"]
     # Keep the approved paper, brush circle, lunar orbit, and footer. Replace
     # only the daily headline/copy so the result remains premium and readable.
     paper=(249,246,238)
@@ -280,7 +306,7 @@ def _render_night(c:dict[str,Any],day:date)->Image.Image:
     _fit(d,body,(105,975,975,1575),max_size=46,min_size=38,line_gap=.42)
     d.line((120,1582,960,1582),fill=gold,width=2)
     _box(d,(80,1570,1000,1760),paper)
-    d.rectangle((115,1588,965,1692),outline=NAVY,width=2)
+    d.rectangle((115,1588,965,1692),outline=primary,width=3)
     _fit(d,c["ending"],(120,1590,960,1680),max_size=38,min_size=32,fill=NAVY,align="center",line_gap=.22)
     return im
 def render_approved_story(content:dict[str,Any],day:date,output_path:str|Path)->Path:

@@ -8,6 +8,7 @@ from backend.story_quality import (
     MOBILE_BODY_MIN,
     MOBILE_SUPPORT_MIN,
     MORNING_BODY_MIN,
+    _apply_daily_palette,
     _decorate,
     design_variant,
     validate_layout_regions,
@@ -45,6 +46,8 @@ def test_seven_designs_rotate_without_consecutive_repeats():
         names=[design_variant(date(2026,7,17)+timedelta(days=i),slot)["name"] for i in range(7)]
         assert len(set(names))==7
         assert all(left!=right for left,right in zip(names,names[1:]))
+        motifs=[design_variant(date(2026,7,17)+timedelta(days=i),slot)["motif_index"] for i in range(7)]
+        assert all(left!=right for left,right in zip(motifs,motifs[1:]))
 
 def test_important_text_regions_are_safe_and_overlap_free():
     for slot in SLOTS:
@@ -57,13 +60,13 @@ def test_exact_design_combinations_do_not_repeat_for_28_days():
         names=[design_variant(date(2026,7,17)+timedelta(days=i),slot)["name"] for i in range(28)]
         assert len(set(names))==28
 
-def test_night_keeps_the_restrained_legacy_decoration():
+def test_column_decoration_stays_tasteful_while_changing_daily():
     base=Image.new("RGB",(1080,1920),(246,242,232))
     decorated=_decorate(base,date(2026,7,19),"night")
     difference=ImageChops.difference(base,decorated)
     mean=sum(ImageStat.Stat(difference).mean)/3
     assert difference.getbbox() is not None
-    assert 0.5<mean<6.0
+    assert 5.0<mean<15.0
 
 def test_mobile_readability_policy_never_shrinks_to_caption_size():
     assert MOBILE_BODY_MIN>=34
@@ -79,13 +82,29 @@ def test_daily_design_rotation_is_visually_detectable():
     assert sum(ImageStat.Stat(difference).mean)/3>1.5
 
 
+def test_morning_palette_changes_are_obvious_on_a_phone():
+    base=Image.new("RGB",(1080,1920),(246,242,232))
+    days=[date(2026,7,24)+timedelta(days=i) for i in range(4)]
+    images=[_decorate(_apply_daily_palette(base,day,"morning"),day,"morning") for day in days]
+    for left,right in zip(images,images[1:]):
+        difference=ImageChops.difference(left,right)
+        assert difference.getbbox() is not None
+        assert sum(ImageStat.Stat(difference).mean)/3>6.0
+        grayscale=difference.convert("L")
+        histogram=grayscale.histogram()
+        changed=sum(histogram[12:])/(1080*1920)
+        assert changed>0.10
+
 def test_workflow_schedules_only_morning_column_and_evening():
     workflow=(Path(__file__).parents[1]/".github/workflows/daily-instagram-story.yml").read_text(encoding="utf-8")
-    assert workflow.count('cron:')==9
-    for cron in ('30 0 * * *','40 0 * * *','50 0 * * *'):
+    assert workflow.count('cron:')==3
+    for cron in ('41 20 * * *','11 0 * * *','11 9 * * *'):
         assert cron in workflow
-    for removed in ('15 3 * * *','25 3 * * *','35 3 * * *','30 12 * * *','40 12 * * *','50 12 * * *'):
+    for removed in ('58 20 * * *','8 21 * * *','18 21 * * *','30 0 * * *','40 0 * * *','50 0 * * *','30 9 * * *','40 9 * * *','50 9 * * *'):
         assert removed not in workflow
+    assert 'PUBLISH_AT="06:00"' in workflow
+    assert 'sleep "${WAIT_SECONDS}"' in workflow
+    assert '--retry' not in workflow
     assert '          - noon' not in workflow
     assert '          - night' not in workflow
 
