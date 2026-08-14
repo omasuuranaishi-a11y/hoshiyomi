@@ -2,13 +2,13 @@
 
 ## 完成している処理
 
-毎朝、次の処理を人の操作なしで実行します。
+毎日6:00・11:00・17:00（日本時間）に、次の処理を人の操作なしで実行します。
 
 1. Swiss Ephemerisで当日7:00（日本時間）の実天体位置を計算
 2. 月のサイン、月相、月のサイン移動時刻、主要アスペクトを抽出
 3. 月・太陽・水星・金星・火星を日運向けに優先
-4. OpenAI APIで「おます」調の3枚分の文章を構造化生成
-5. 1080×1920pxのJPEGを3枚生成
+4. 承認済みの文章ライブラリから、日常感と論理性のある本文を組み立てる
+5. きょうの暦と月・ミニコラム・タロットノートを1080×1920pxのJPEGで生成
 6. Instagramの上下UI安全領域、文字枠の衝突、文字収まり、画像サイズを自動検査
 7. 検査に合格した画像だけをMeta公式APIへ渡す
 8. Instagramストーリーへ投稿
@@ -20,13 +20,13 @@ Canvaは使いません。現在の生成り、くすみパープル、ゴール
 ## 本番で使うファイル
 
 - `backend/automation_main_final.py`: Web APIの起動先
-- `backend/story_automation_final.py`: 全体の実行制御
+- `backend/story_automation_four.py`: 3枠の実行制御と二重投稿防止
 - `backend/story_sky_daily.py`: 日運向け天体計算
-- `backend/story_copy.py`: OpenAIによる文章生成
-- `backend/story_renderer_final.py`: 3枚の画像生成
+- `backend/story_four.py`: 暦・コラム・タロットの文章ライブラリ
+- `backend/story_quality.py`: 3種類の画像生成と公開前検査
 - `backend/instagram.py`: Meta公式APIへの投稿
 - `requirements-instagram.txt`: Python依存関係
-- `.github/workflows/daily-instagram-story.yml`: 毎朝7時の実行
+- `.github/workflows/daily-instagram-story.yml`: 6:00・11:00・17:00の実行
 
 `render-final.yaml`はRender設定の見本です。既存のHoshiyomiサービスへ重ねる場合は、Render画面で下記のBuild CommandとStart Commandを設定します。
 
@@ -104,7 +104,7 @@ Renderの環境変数:
 
 `ALLOW_FALLBACK_COPY=false` により、OpenAI APIが失敗した日は質の低い文章を勝手に投稿せず、投稿を停止します。
 
-## 4. GitHub Actionsの毎朝7時設定
+## 4. GitHub Actionsの毎日3回設定
 
 リポジトリの Settings → Secrets and variables → Actions に、次の2つを追加します。
 
@@ -113,21 +113,25 @@ Renderの環境変数:
 | `AUTOMATION_URL` | `https://RenderのURL/api/automation/daily-story` |
 | `AUTOMATION_SECRET` | Renderに設定したものと同じ文字列 |
 
-`.github/workflows/daily-instagram-story.yml` は毎日22:00 UTC、つまり翌朝7:00 JSTに起動します。
+`.github/workflows/daily-instagram-story.yml` は各枠の19分前に処理を起動し、次の時刻まで待ってから投稿します。各枠を1回の実行に限定し、曖昧な通信結果による二重投稿を防ぎます。
+
+- 6:00 JST: きょうの暦と月
+- 11:00 JST: 暮らしと思考のミニコラム
+- 17:00 JST: タロットノート
+
+この3枠は2026年8月15日から有効です。
 
 ## 5. 最初の安全確認
 
-まず `dry_run=true` と `offline=true` で、Instagramへ投稿せず画像だけ生成します。
+まず `dry_run=true` で、Instagramへ投稿せず画像だけ生成します。`slot` は `morning`・`night`・`evening` の順に確認します。
 
 ```bash
 curl -X POST \
   -H "Authorization: Bearer あなたのAUTOMATION_SECRET" \
-  "https://RenderのURL/api/automation/daily-story?dry_run=true&offline=true&force=true"
+  "https://RenderのURL/api/automation/daily-story?slot=morning&target_date=2026-08-15&dry_run=true&force=true"
 ```
 
-返ってきた `asset_urls` をブラウザで開き、3枚とも問題がないことを確認します。
-
-OpenAIの文章を含む本番前確認では、`offline=true` だけを外します。初回の実投稿は、画像を確認した後に手動実行してください。
+返ってきた `asset_url` をブラウザで開き、3枠とも問題がないことを確認します。初回の実投稿は、画像を確認した後に定時実行を有効にしてください。
 
 ## 安全設計
 

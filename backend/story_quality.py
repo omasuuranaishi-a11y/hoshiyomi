@@ -14,6 +14,7 @@ SAFE_BOTTOM = 1680
 ROOT = Path(__file__).resolve().parent
 REFERENCE = ROOT / "assets" / "reference"
 FONT_DIR = ROOT / "assets" / "fonts"
+TAROT_DIR = ROOT / "assets" / "tarot"
 PAPER=(249,245,235); INK=(14,39,64); NAVY=(4,44,73); JADE=(24,119,117)
 CORAL=(235,111,86); GOLD=(181,139,70); WHITE=(255,253,247); MUTED=(91,91,85)
 MOBILE_BODY_MIN = 34
@@ -50,7 +51,8 @@ def _apply_daily_palette(im:Image.Image,day:date,slot:str)->Image.Image:
     if slot=="morning":
         # These polygons follow the approved collage edges and preserve the
         # paper texture while changing the dominant palette every day.
-        d.polygon(((0,0),(355,0),(245,285),(0,390)),fill=(*primary,205))
+        # Keep the rotating color field outside the fixed masthead lettering.
+        d.polygon(((0,0),(190,0),(120,300),(0,390)),fill=(*primary,205))
         d.polygon(((760,0),(1080,0),(1080,405),(910,275)),fill=(*dark_secondary,215))
         d.polygon(((0,1490),(275,1660),(365,1920),(0,1920)),fill=(*secondary,185))
         d.polygon(((1080,1450),(845,1680),(755,1920),(1080,1920)),fill=(*_mix_color(primary,gold,.40),175))
@@ -77,9 +79,11 @@ def _decorate(im:Image.Image,day:date,slot:str)->Image.Image:
             for x,y in ((28,230),(1052,260),(28,1390),(1052,1580)):
                 d.ellipse((x-6,y-6,x+6,y+6),fill=(*gold,220));d.line((x-18,y,x+18,y),fill=(*gold,180),width=2);d.line((x,y-18,x,y+18),fill=(*gold,180),width=2)
         elif v==2:
-            d.arc((-260,1180,110,1680),270,70,fill=(*secondary,190),width=6)
+            # Keep this motif entirely in the outer margin. It is drawn after
+            # the copy, so even a translucent stroke must never enter x=85+.
+            d.arc((-330,1180,45,1680),270,70,fill=(*secondary,75),width=4)
             for i in range(6):
-                y=1375+i*42;d.ellipse((8+i*6,y,48+i*6,y+21),fill=(*secondary,120))
+                y=1375+i*42;d.ellipse((2+i*3,y,24+i*3,y+16),fill=(*secondary,55))
         else:
             d.polygon(((0,0),(125,0),(78,105),(0,145)),fill=(*primary,75));d.polygon(((1080,1920),(930,1920),(985,1795),(1080,1740)),fill=(*secondary,70))
         return im
@@ -109,10 +113,10 @@ def _decorate(im:Image.Image,day:date,slot:str)->Image.Image:
 
 def _regions_for_slot(slot:str)->list[tuple[str,tuple[int,int,int,int]]]:
     regions={
-        "morning":[("date",(265,335,815,456)),("solar_term",(130,630,755,712)),("season_note",(130,750,755,840)),("moon_phase",(120,1085,750,1158)),("moon_line",(120,1170,750,1315)),("daily_hint",(195,1445,900,1570)),("daily_question",(188,1597,905,1663))],
+        "morning":[("date",(265,335,815,456)),("solar_term",(130,630,755,712)),("season_note",(130,748,755,852)),("moon_phase",(120,955,760,1010)),("moon_line",(120,1035,760,1125)),("daily_hint",(120,1275,960,1460)),("daily_question",(130,1535,950,1680))],
         "noon":[("fire_action",(117,883,488,991)),("earth_action",(592,883,963,991)),("air_action",(117,1488,488,1601)),("water_action",(592,1488,963,1601)),("noon_footer",(115,1625,965,1680))],
-        "evening":[("evening_headline",(365,438,955,500)),("sky_state",(380,674,960,835)),("mind_tendency",(380,940,960,1095)),("maintenance_actions",(400,1270,955,1470)),("evening_footer",(275,1505,1010,1652))],
-        "night":[("column_headline",(105,400,975,680)),("column_body",(105,975,975,1575)),("column_ending",(120,1590,960,1680))],
+        "evening":[("card_identity",(80,340,520,470)),("evening_headline",(550,345,1000,520)),("card_art",(80,480,520,1120)),("symbol_notes",(550,535,1000,945)),("card_core",(550,955,1000,1170)),("tarot_method",(80,1180,1000,1660))],
+        "night":[("column_headline",(105,385,975,690)),("column_body",(85,900,995,1680))],
     }
     if slot not in regions:raise ValueError(f"Unknown story slot: {slot}")
     return regions[slot]
@@ -148,6 +152,30 @@ def _font_path() -> str:
 def _font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(_font_path(), size=size)
 
+def _gothic_font(size: int) -> ImageFont.FreeTypeFont:
+    path=FONT_DIR / "ZenMaruGothic-Regular.ttf"
+    if not path.is_file():
+        raise RuntimeError(f"Rounded Gothic font is missing: {path}")
+    return ImageFont.truetype(str(path),size=size)
+
+def _gothic_bold_font(size: int) -> ImageFont.FreeTypeFont:
+    path=FONT_DIR / "ZenMaruGothic-Bold.ttf"
+    if not path.is_file():
+        raise RuntimeError(f"Rounded Gothic font is missing: {path}")
+    return ImageFont.truetype(str(path),size=size)
+
+def _handwritten_gothic_font(size: int) -> ImageFont.FreeTypeFont:
+    path=FONT_DIR / "KleeOne-SemiBold.ttf"
+    if not path.is_file():
+        raise RuntimeError(f"Handwritten Gothic font is missing: {path}")
+    return ImageFont.truetype(str(path),size=size)
+
+def _handwritten_gothic_regular_font(size: int) -> ImageFont.FreeTypeFont:
+    path=FONT_DIR / "KleeOne-Regular.ttf"
+    if not path.is_file():
+        raise RuntimeError(f"Handwritten Gothic font is missing: {path}")
+    return ImageFont.truetype(str(path),size=size)
+
 def _master(name: str) -> Image.Image:
     path = REFERENCE / name
     if not path.is_file():
@@ -170,10 +198,44 @@ def _wrap(draw, text, font, width):
     if current or not lines: lines.append(current)
     return lines
 
-def _fit(draw, text, box, *, max_size, min_size=22, fill=INK, align="left", line_gap=.48):
+def _wrap_kinsoku(draw, text, font, width):
+    """Wrap Japanese prose without orphan punctuation or width overflow."""
+    closing="。、？！』）」】"
+    opening="『「（(【"
+    lines=[]
+    for paragraph in str(text).split("\n"):
+        wrapped=[]; current=""
+        for char in paragraph:
+            trial=current+char
+            if current and draw.textlength(trial,font=font)>width:
+                # Pull one readable character with closing punctuation onto the
+                # next line. Likewise, never strand an opening mark at line end.
+                if (char in closing or current[-1:] in opening) and len(current)>1:
+                    carry=current[-1]
+                    wrapped.append(current[:-1])
+                    current=carry+char
+                else:
+                    wrapped.append(current)
+                    current=char
+            else:
+                current=trial
+        if current or not wrapped:
+            wrapped.append(current)
+        if len(wrapped)>1 and len(wrapped[-1].strip())<=3 and len(wrapped[-2])>4:
+            needed=4-len(wrapped[-1].strip())
+            carry=wrapped[-2][-needed:]
+            wrapped[-2]=wrapped[-2][:-needed]
+            wrapped[-1]=carry+wrapped[-1]
+        lines.extend(wrapped)
+    return lines
+
+def _fit(draw, text, box, *, max_size, min_size=22, fill=INK, align="left", line_gap=.48,font_fn=_font,wrap_fn=_wrap):
     x1,y1,x2,y2=box
-    for size in range(max_size,min_size-1,-2):
-        font=_font(size); lines=_wrap(draw,text,font,x2-x1)
+    sizes=list(range(max_size,min_size-1,-2))
+    if not sizes or sizes[-1]!=min_size:
+        sizes.append(min_size)
+    for size in sizes:
+        font=font_fn(size); lines=wrap_fn(draw,text,font,x2-x1)
         ascent,descent=font.getmetrics(); gap=int(size*line_gap); line_h=ascent+descent+gap
         if len(lines)*line_h-gap<=y2-y1:
             y=y1
@@ -205,21 +267,37 @@ def _render_morning(c:dict[str,Any],day:date)->Image.Image:
     _box(d,(115,615,765,840),(250,247,238))
     _fit(d,f"二十四節気｜{c['term']}",(130,630,755,712),max_size=47)
     d.line((130,738,720,738),fill=primary,width=3)
-    _fit(d,"季節の変化を、暮らしの目印に。",(130,750,755,840),max_size=40,min_size=38,line_gap=.24)
+    _fit(d,c["season_note"],(130,748,755,852),max_size=36,min_size=32,line_gap=.20)
     _box(d,(770,530,925,780),(247,243,231))
     _center(d,day.strftime("%B").upper(),552,24,fill=(51,97,73),left=770,right=925)
     _center(d,str(day.day),610,62,fill=(51,97,73),left=770,right=925)
     _center(d,day.strftime("%a").upper(),690,26,fill=(51,97,73),left=770,right=925)
-    d.rounded_rectangle((102,1070,758,1325),radius=12,fill=dark_primary)
-    _fit(d,f"{c['phase']}｜{c['illumination']:.1f}%",(120,1085,750,1158),max_size=42,min_size=MORNING_BODY_MIN,fill=WHITE)
-    d.line((120,1168,720,1168),fill=gold,width=3)
-    _fit(d,c["moon_line"],(120,1170,750,1315),max_size=42,min_size=MORNING_BODY_MIN,fill=WHITE,line_gap=.30)
-    _box(d,(165,1430,925,1580),(250,247,238))
-    _fit(d,c["hint"],(195,1445,900,1570),max_size=44,min_size=36,align="center",line_gap=.32)
-    d.rounded_rectangle((130,1580,950,1775),radius=24,fill=(250,247,238),outline=secondary,width=3)
-    d.line((220,1705,860,1705),fill=secondary,width=3)
-    _box(d,(170,1588,920,1670),(250,247,238))
-    _fit(d,f"今日の問い｜{c['question']}",(188,1597,905,1663),max_size=38,min_size=32,align="center",line_gap=.30)
+    # Rebuild the complete lower half as two independent cards. The approved
+    # master contains legacy moon and hint copy in this area; the opaque base
+    # removes it before any new text is drawn.
+    lower_paper=(250,247,238)
+    d.rounded_rectangle((65,880,1015,1740),radius=34,fill=lower_paper,outline=gold,width=3)
+
+    # Card 1: lunar state. Its text ends at y=1125, before the guidance card.
+    d.rounded_rectangle((85,900,995,1150),radius=24,fill=dark_primary,outline=gold,width=3)
+    d.ellipse((820,925,940,1085),fill=gold)
+    d.ellipse((780,900,900,1060),fill=dark_primary)
+    for x,y in ((790,1085),(955,960),(760,980)):
+        d.ellipse((x-4,y-4,x+4,y+4),fill=gold)
+    d.rounded_rectangle((105,885,390,945),radius=14,fill=_mix_color(PAPER,secondary,0.42))
+    _fit(d,"月の満ち欠け",(125,895,370,935),max_size=29,min_size=27,fill=NAVY,align="center",line_gap=0)
+    _fit(d,f"{c['phase']}｜{c['illumination']:.1f}%",(120,955,760,1010),max_size=42,min_size=MORNING_BODY_MIN,fill=WHITE)
+    d.line((120,1020,740,1020),fill=gold,width=3)
+    _fit(d,c["moon_line"],(120,1035,760,1125),max_size=38,min_size=36,fill=WHITE,line_gap=.08)
+
+    # Card 2: guidance. Every text box has a dedicated vertical band.
+    d.rounded_rectangle((85,1175,995,1715),radius=28,fill=lower_paper,outline=CORAL,width=3)
+    d.rounded_rectangle((100,1190,655,1265),radius=18,fill=CORAL)
+    _fit(d,"星回りからの今日の導き",(120,1198,635,1255),max_size=34,min_size=30,fill=WHITE,align="center",line_gap=.05)
+    _fit(d,c["hint"],(120,1275,960,1460),max_size=31,min_size=29,align="left",line_gap=.05)
+    d.rounded_rectangle((105,1470,975,1695),radius=22,fill=_mix_color(lower_paper,secondary,0.06),outline=secondary,width=3)
+    _fit(d,"今日の一手",(130,1480,950,1525),max_size=31,min_size=29,fill=secondary,line_gap=.02)
+    _fit(d,c["thinking"],(130,1535,950,1680),max_size=33,min_size=29,line_gap=.12)
     return im
 
 def _render_noon(c:dict[str,Any],day:date)->Image.Image:
@@ -266,8 +344,74 @@ def _render_noon(c:dict[str,Any],day:date)->Image.Image:
     _center(d,f"{day.year}.{day.month}.{day.day}  @omasu_horoscope",1805,23,fill=MUTED)
     return im
 
+def _render_tarot(c:dict[str,Any],day:date)->Image.Image:
+    validate_layout_regions("evening")
+    theme=design_variant(day,"evening"); primary=theme["primary"]; secondary=theme["secondary"]; gold=theme["gold"]
+    dark_primary=_mix_color(NAVY,primary,0.28)
+    im=Image.new("RGB",(WIDTH,HEIGHT),PAPER); d=ImageDraw.Draw(im)
+    d.rectangle((0,0,58,HEIGHT),fill=dark_primary)
+    d.polygon(((760,0),(1080,0),(1080,250),(940,185)),fill=dark_primary)
+    d.polygon(((0,1770),(230,1660),(360,1920),(0,1920)),fill=_mix_color(PAPER,secondary,0.38))
+    d.rounded_rectangle((24,24,1056,1896),radius=44,outline=gold,width=4)
+    for x,y in ((90,115),(1010,310),(55,1160),(1015,1410)):
+        d.ellipse((x-7,y-7,x+7,y+7),fill=gold);d.line((x-21,y,x+21,y),fill=gold,width=2);d.line((x,y-21,x,y+21),fill=gold,width=2)
+    _fit(d,"SYMBOL TAROT NOTE",(85,55,540,110),max_size=25,min_size=23,fill=MUTED,font_fn=_gothic_font)
+    d.rounded_rectangle((720,42,1010,112),radius=14,fill=dark_primary)
+    _fit(d,_date_text(day),(735,55,995,105),max_size=28,min_size=25,fill=WHITE,align="center",font_fn=_gothic_font)
+    _fit(d,c["title"],(80,160,1000,260),max_size=70,min_size=60,align="center",font_fn=_gothic_bold_font)
+    _fit(d,c["subtitle"],(160,275,920,330),max_size=30,min_size=27,fill=MUTED,align="center",font_fn=_gothic_font)
+
+    _fit(d,"今回のカード",(80,340,520,382),max_size=23,min_size=21,fill=primary,font_fn=_gothic_bold_font,line_gap=.05)
+    _fit(d,f"大アルカナ {c['card_number']}｜{c['card_name']}",(80,382,520,470),max_size=40,min_size=32,font_fn=_gothic_bold_font,line_gap=.05)
+
+    art_box=(80,480,520,1120)
+    art_candidates=sorted(TAROT_DIR.glob(f"major-{c['card_number']:02d}-*-v*.png"))
+    art_path=art_candidates[-1] if art_candidates else None
+    if art_path is not None:
+        with Image.open(art_path) as source:
+            art=source.convert("RGB")
+            target_w=art_box[2]-art_box[0]; target_h=art_box[3]-art_box[1]
+            scale=max(target_w/art.width,target_h/art.height)
+            resized=art.resize((round(art.width*scale),round(art.height*scale)),Image.Resampling.LANCZOS)
+            left=max(0,(resized.width-target_w)//2); top=max(0,(resized.height-target_h)//2)
+            im.paste(resized.crop((left,top,left+target_w,top+target_h)),art_box[:2])
+    else:
+        d.rounded_rectangle(art_box,radius=24,fill=dark_primary,outline=gold,width=5)
+        _fit(d,f"{c['card_number']:02d}\n{c['card_name']}",(120,620,480,880),max_size=72,min_size=52,fill=WHITE,align="center",line_gap=.30,font_fn=_gothic_bold_font)
+    d.rounded_rectangle(art_box,radius=24,outline=gold,width=5)
+
+    _fit(d,f"解説テーマ｜{c['category']}",(550,345,1000,390),max_size=26,min_size=23,fill=primary,font_fn=_gothic_bold_font,line_gap=.05)
+    _fit(d,c["headline"],(550,392,1000,520),max_size=48,min_size=34,font_fn=_gothic_bold_font,line_gap=.16)
+    symbol_items=[item.strip() for item in c["notes"].split("／")]
+    note_tops=(535,675,815)
+    connector_ys=(600,740,880)
+    for item,top,connector_y in zip(symbol_items,note_tops,connector_ys):
+        label,meaning=(item.split("＝",1)+[""])[:2]
+        d.line((500,connector_y,555,connector_y),fill=gold,width=3)
+        d.ellipse((494,connector_y-5,504,connector_y+5),fill=gold)
+        d.rounded_rectangle((550,top,1000,top+130),radius=16,fill=(253,249,240),outline=gold,width=2)
+        _fit(d,label,(575,top+12,975,top+55),max_size=31,min_size=27,fill=primary,font_fn=_gothic_bold_font)
+        _fit(d,meaning,(575,top+58,975,top+117),max_size=29,min_size=25,line_gap=.14,font_fn=_gothic_font)
+    d.rounded_rectangle((550,955,1000,1170),radius=18,fill=_mix_color(PAPER,primary,0.10),outline=primary,width=3)
+    _fit(d,"カードの成り立ち",(575,970,975,1010),max_size=28,min_size=25,fill=primary,font_fn=_gothic_bold_font)
+    _fit(d,c["origin"],(575,1018,975,1158),max_size=24,min_size=19,line_gap=.08,font_fn=_gothic_font)
+
+    d.rounded_rectangle((80,1180,1000,1660),radius=26,fill=(253,249,240),outline=secondary,width=3)
+    _fit(d,"意味をどう読む？",(115,1205,965,1255),max_size=34,min_size=30,fill=secondary,font_fn=_gothic_bold_font)
+    _fit(d,f"{c['core']}\n{c['method']}",(115,1270,965,1440),max_size=29,min_size=22,line_gap=.12,font_fn=_gothic_font)
+    d.line((115,1465,965,1465),fill=gold,width=2)
+    _fit(d,"おますの読み解き",(115,1490,410,1530),max_size=26,min_size=23,fill=primary,font_fn=_gothic_bold_font)
+    _fit(d,c["humor"],(115,1540,965,1640),max_size=28,min_size=24,line_gap=.12,font_fn=_gothic_font)
+
+    d.line((260,1730,820,1730),fill=gold,width=2)
+    _fit(d,"OMASU TAROT NOTE",(300,1765,780,1810),max_size=25,min_size=22,fill=MUTED,align="center",font_fn=_gothic_font)
+    _fit(d,"@omasu_horoscope",(300,1820,780,1870),max_size=25,min_size=22,fill=MUTED,align="center",font_fn=_gothic_font)
+    return im
+
 def _render_evening(c:dict[str,Any],day:date)->Image.Image:
     validate_layout_regions("evening")
+    if c.get("content_kind")=="tarot_knowledge":
+        return _render_tarot(c,day)
     im=_apply_daily_palette(_master("evening-approved.png"),day,"evening"); d=ImageDraw.Draw(im)
     theme=design_variant(day,"evening"); primary=theme["primary"]; secondary=theme["secondary"]; gold=theme["gold"]
     dark_primary=_mix_color(NAVY,primary,0.35)
@@ -277,13 +421,13 @@ def _render_evening(c:dict[str,Any],day:date)->Image.Image:
     _box(d,(420,570,1020,820),(249,245,235))
     _box(d,(420,835,1020,1095),(249,245,235))
     _box(d,(410,1135,1000,1475),(250,247,239))
-    _box(d,(365,580,975,840),(249,245,235)); _fit(d,"星の状態",(380,590,950,646),max_size=37,min_size=34)
+    _box(d,(365,580,975,840),(249,245,235)); _fit(d,"空の読み方",(380,590,950,646),max_size=37,min_size=34)
     d.line((380,660,960,660),fill=gold,width=3)
-    _fit(d,f"{c['sky']}｜{c['context']}",(380,674,960,835),max_size=37,min_size=MOBILE_BODY_MIN,line_gap=.28)
-    _box(d,(365,840,975,1110),(249,245,235)); _fit(d,"心の傾向",(380,850,950,910),max_size=37,min_size=34)
+    _fit(d,f"{c['sky']}\n{c['context']}",(380,674,960,835),max_size=37,min_size=MOBILE_BODY_MIN,line_gap=.28)
+    _box(d,(365,840,975,1155),(249,245,235)); _fit(d,"暮らしへの翻訳",(380,850,950,910),max_size=37,min_size=34)
     d.line((380,926,960,926),fill=gold,width=3)
-    _fit(d,f"{c['tendency']}。\n{c['adjust']}。",(380,940,960,1095),max_size=37,min_size=MOBILE_BODY_MIN,line_gap=.28)
-    _box(d,(365,1180,975,1475),(250,247,239)); _fit(d,"今夜の3分メンテ",(380,1190,950,1250),max_size=37,min_size=34,fill=primary)
+    _fit(d,f"{c['tendency']}\n{c['adjust']}",(380,940,960,1140),max_size=37,min_size=MOBILE_BODY_MIN,line_gap=.28)
+    _box(d,(365,1180,975,1475),(250,247,239)); _fit(d,"今夜の3分整理",(380,1190,950,1250),max_size=37,min_size=34,fill=primary)
     y=1270
     for action in c["actions"]:
         d.ellipse((378,y+13,394,y+29),fill=gold)
@@ -299,15 +443,14 @@ def _render_night(c:dict[str,Any],day:date)->Image.Image:
     # Keep the approved paper, brush circle, lunar orbit, and footer. Replace
     # only the daily headline/copy so the result remains premium and readable.
     paper=(249,246,238)
-    _box(d,(85,370,995,705),paper)
-    _fit(d,c["headline"],(105,400,975,680),max_size=82,min_size=60,align="center",line_gap=.24)
-    _box(d,(85,940,995,1585),paper)
-    body="\n\n".join(c["paragraphs"])
-    _fit(d,body,(105,975,975,1575),max_size=46,min_size=38,line_gap=.42)
-    d.line((120,1582,960,1582),fill=gold,width=2)
-    _box(d,(80,1570,1000,1760),paper)
-    d.rectangle((115,1588,965,1692),outline=primary,width=3)
-    _fit(d,c["ending"],(120,1590,960,1680),max_size=38,min_size=32,fill=NAVY,align="center",line_gap=.22)
+    _box(d,(160,175,920,330),paper)
+    _fit(d,f"{c['title']}  {c['number']:02d}",(180,205,900,285),max_size=38,min_size=32,align="center",fill=NAVY,font_fn=_handwritten_gothic_regular_font)
+    d.line((260,310,820,310),fill=gold,width=2)
+    _box(d,(85,355,995,720),paper)
+    _fit(d,c["headline"],(105,385,975,690),max_size=82,min_size=62,align="center",line_gap=.20,font_fn=_handwritten_gothic_font)
+    # One uninterrupted essay block: no labels, subheads, or boxed callout.
+    _box(d,(65,860,1015,1730),paper)
+    _fit(d,c["column"],(85,900,995,1680),max_size=41,min_size=36,line_gap=.22,font_fn=_gothic_font,wrap_fn=_wrap_kinsoku)
     return im
 def render_approved_story(content:dict[str,Any],day:date,output_path:str|Path)->Path:
     validate_layout_regions(content["slot"])

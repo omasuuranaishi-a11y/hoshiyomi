@@ -1,4 +1,5 @@
 from __future__ import annotations
+from dataclasses import dataclass
 from datetime import date
 import hashlib
 from pathlib import Path
@@ -17,10 +18,556 @@ ACTIONS={
 "水":("一人で静かな時間をとる","手を温めて呼吸を数える","湯船で感情をほどく","無理な共感から少し離れる","好きな香りを一つ選ぶ","涙や沈黙を急いで止めない","安心できる場所に戻る","今の気分に名前をつける")}
 TEND={
 "牡羊座":("急いで答えを出したくなる","勢いを、小さな着手に変える"),"牡牛座":("慣れた安心を守りたくなる","五感が落ち着く順番を選ぶ"),"双子座":("考えと言葉が増えやすい","情報を一度、外へ書き出す"),"蟹座":("周りの気持ちを抱えやすい","自分の安心を先に確かめる"),"獅子座":("自分らしく表したくなる","人の評価より納得を選ぶ"),"乙女座":("足りない所に目が向きやすい","反省ではなく調整に使う"),"天秤座":("正解の間で揺れやすい","両方が少し楽な形を探す"),"蠍座":("一つのことを深く考えやすい","本音を一行だけ言葉にする"),"射手座":("遠くへ気持ちが向かいやすい","今日の一歩に好奇心を戻す"),"山羊座":("結果と責任を背負いやすい","続けられる量まで小さくする"),"水瓶座":("いつもの形に窮屈さを感じる","やり方を一つだけ変えてみる"),"魚座":("境界がやわらかくなりやすい","感じる時間と休息を分ける")}
-ZEN=(("答えを急がない夜","余計な動きを止める"),("握りしめない練習","変わっていくものを追いかけない"),("足りないものを数えない","すでにあるものへ視線を戻す"),("心を静かに眺める","良し悪しを決めず、ただ気づく"),("真ん中へ戻る夜","頑張りすぎと諦めの間を選ぶ"),("手放すのは、負けではない","役目を終えた考えを下ろす"),("今日を今日のまま閉じる","未完成を責めずに眠りへ渡す"),("静けさは、つくるものではない","重ねた判断を一枚ずつ外す"))
+
+COPY_LIBRARY_VERSION="2026-08-15-v11"
+SIGN_ORDER=tuple(ELEMENT)
+TAROT_START_DATE=date(2026,8,15)
+
+
+@dataclass(frozen=True)
+class SignLens:
+    tendency:str
+    logic:str
+    action:str
+
+
+SIGN_LENSES={
+    "牡羊座":SignLens("考えるより先に動きたくなる","速さは強み。でも、着手が増えるほど完了は遠のきます","15分で終わる一つに絞る"),
+    "牡牛座":SignLens("慣れた順番を変えたくなくなる","安心は大切。でも、慣れていることと必要なことは別です","残したい習慣を一つ決める"),
+    "双子座":SignLens("選択肢と言葉が増えやすい","情報が増えるほど、比較する基準も増えます","検索する前に条件を二つ決める"),
+    "蟹座":SignLens("周りの気分を先回りしやすい","気づかうことと、全部を引き受けることは別です","自分の予定を先に確認する"),
+    "獅子座":SignLens("納得より人の評価が気になりやすい","見栄えがよいことと、目的に合うことは別です","誰に何を伝えるか一つに絞る"),
+    "乙女座":SignLens("足りない点へ目が向きやすい","直す場所が増えるほど、終わりの条件が曖昧になります","合格条件を三つだけ決める"),
+    "天秤座":SignLens("全員が納得する答えを探しやすい","条件を増やすほど、決めるまでの時間も長くなります","今日優先する人と期限を決める"),
+    "蠍座":SignLens("理由を深く掘り下げたくなる","事実が増えないまま考えると、推測だけが濃くなります","事実と解釈を二列に分ける"),
+    "射手座":SignLens("先の可能性へ気持ちが向きやすい","選択肢を広げる段階と、今日決める段階は別です","次の30分で動くことへ戻す"),
+    "山羊座":SignLens("責任を自分で抱えやすい","できることと、今引き受けることは別です","期限と担当を言葉にする"),
+    "水瓶座":SignLens("いつものやり方に窮屈さを感じやすい","仕組みを比べるなら、一度に変える条件は一つが安全です","順番だけ変えて一度試す"),
+    "魚座":SignLens("人の気分と自分の気分が混ざりやすい","共感することと、同意して背負うことは別です","自分の気持ちを一文にする"),
+}
+
+SIGN_THEMES={
+    "牡羊座":"着手と速度","牡牛座":"安心と継続","双子座":"情報と比較",
+    "蟹座":"気づかいと境界","獅子座":"表現と納得","乙女座":"点検と整理",
+    "天秤座":"比較と合意","蠍座":"事実と解釈","射手座":"可能性と一歩",
+    "山羊座":"責任と配分","水瓶座":"仕組みと実験","魚座":"共感と境界",
+}
+
+# The column uses the moon sign as a symbolic opening, then brings that image
+# down to one ordinary scene. These are original sentences: the aim is a warm,
+# image-led essay structure, not imitation of any writer.
+COLUMN_SIGN_OPENINGS={
+    "牡羊座":"月が牡羊座を進む日は、心の中のスタートボタンが少し敏感になります。動き出す力は頼もしいけれど、始めるものが増えれば、終わりは遠のきます。",
+    "牡牛座":"月が牡牛座を進む日は、いつもの手触りが安心をつくります。けれど、慣れていることと、今の自分に必要なことは、同じとは限りません。",
+    "双子座":"月が双子座を進む日は、頭の中にいくつもの窓が開きます。風通しはよくなりますが、窓が多すぎると、どこから外を見るか迷います。",
+    "蟹座":"月が蟹座を進む日は、周りの気配がいつもより近く感じられます。気づかいは優しさですが、全部を引き受けることとは別です。",
+    "獅子座":"月が獅子座を進む日は、自分らしい光をどこへ向けるかが気になります。見栄えより、誰に何を届けたいかが輪郭をつくります。",
+    "乙女座":"月が乙女座を進む日は、暮らしの小さな綻びがよく見えます。それは欠点探しではなく、手入れの場所を知らせる目印です。",
+    "天秤座":"月が天秤座を進む日は、いくつもの正しさを同じテーブルへ並べたくなります。全員の納得を待つより、今日の期限を一つ置くと話が進みます。",
+    "蠍座":"月が蠍座を進む日は、一つのことを深く見つめる力が増します。ただ、事実が増えないまま潜ると、推測だけが濃くなることもあります。",
+    "射手座":"月が射手座を進む日は、気持ちが少し遠くまで旅をします。可能性を広げることと、今日の一歩を決めることは、別の仕事です。",
+    "山羊座":"月が山羊座を進む日は、責任の輪郭がくっきりします。できることを全部引き受けるより、期限と担当を言葉にする方が長く続きます。",
+    "水瓶座":"月が水瓶座を進む日は、いつもの仕組みに小さな違和感が灯ります。全部を変えなくても、順番を一つ替えるだけで風向きは確かめられます。",
+    "魚座":"月が魚座を進む日は、人の気持ちと自分の気持ちの境目がやわらかくなります。共感は大切でも、同じ荷物まで持つ必要はありません。",
+}
+
+COLUMN_CLOSINGS={
+    "line_reply":"返事を急がないことは、関係を雑にしないための、静かな準備でもあります。",
+    "todo":"全部を背負う代わりに順番を決めると、忙しさは少しだけ道になります。",
+    "family_change":"予定が変わっても、今日そのものまで壊れたわけではありません。",
+    "shopping_list":"選ばない物を決めることも、今日の暮らしを選ぶことの一部です。",
+    "request":"返事の前の小さな確認は、親切を長持ちさせます。",
+    "dinner":"献立は理想の食卓ではなく、今夜の自分を助ける答えで十分です。",
+    "phone":"画面を閉じる時刻を決めると、休息は残り時間ではなく予定になります。",
+    "work_quality":"完成とは、もう直せない状態ではなく、目的を果たしたと認めることです。",
+    "tidying":"部屋全部ではなく一面だけでも、景色が変われば次の一歩は軽くなります。",
+    "other_mood":"分からない理由を背負わないことは、冷たさではなく境界です。",
+    "impulse_buy":"欲しい気持ちを否定せず、買う時期だけを明日に預けてもいいのです。",
+    "rest":"休む時刻を先に置くと、休息はご褒美ではなく一日の土台になります。",
+    "group_chat":"通知の多さと、自分の仕事の多さは、同じではありません。",
+    "family_roles":"予定は時刻だけでなく、役割まで言葉にしたとき、ようやく共有になります。",
+    "searching":"探す範囲を小さくすると、焦りの中にも順番が戻ってきます。",
+    "meeting":"話す量を減らすのではなく、決める場所を一つ作る。それだけで会話は前へ進みます。",
+    "low_energy":"使える力に合わせて予定を組み直すのは、諦めではなく配分です。",
+    "day_off":"何もしない時間は、予定の空白ではなく、休日の中心に置いていいものです。",
+    "subscription":"小さな月額も一年へ伸ばすと、暮らしの意思が数字になって見えてきます。",
+    "laundry":"家事を一工程まで小さくすると、山に見えたものにも入口ができます。",
+    "morning_rush":"遅れを取り戻すより、守る三つを決める方が、朝は静かに立て直せます。",
+    "appointment":"不安を消そうとするより、未確定の情報を一つ減らす方が、心は現実へ戻ります。",
+    "email":"伝えたい順ではなく、相手が決めやすい順に並べると、言葉は仕事を始めます。",
+    "reversible":"決断を小さな実験へ変えると、怖さの中にも戻れる道が残ります。",
+}
+
+
+@dataclass(frozen=True)
+class DailyScene:
+    key:str
+    headline:str
+    situation:str
+    logic:str
+    criterion:str
+    morning_hint:str
+    question:str
+    actions:tuple[str,str,str]
+    ending:str
+
+
+DAILY_SCENES=(
+    DailyScene("line_reply","『すぐ返さなきゃ』を事実に戻す","LINEの未返信が気になるとき","事実は『未返信がある』だけ。相手が怒っているかは、まだ推測です","急ぎ・今日中・後日でよいものに分ける","返信は速さより締切で決める。急ぎの1件だけ二文で返す","今日中に返す必要があるのは何件？",("未返信を今日・明日・不要に分ける","急ぎの1件だけ、二文で返す","残りは返信する時刻を決める"),"推測で予定を埋めない"),
+    DailyScene("todo","やることの多さを、順番に変える","頭の中の用事が増えたとき","未分類の用事は、全部が同じ緊急度に見えてしまいます","締切と所要時間の二軸で並べる","ToDoを締切順に並べ、15分で終わる1件に○をつける","今日17時までの一つは？",("用事を紙へ全部書き出す","今日が締切のものだけ囲む","15分で終わる1件から始める"),"量ではなく順番を決める"),
+    DailyScene("family_change","予定変更で、全部を崩さない","家族の予定変更が入ったとき","変更は一つでも、頭の中では一日の計画全体を組み直そうとします","固定・動かせる・頼める予定に分ける","予定変更は、固定・動かせる・頼めるの3つに分ける","今日、動かせない予定はどれ？",("動かせない予定を一つ確認する","後ろへずらせる用事に印をつける","頼めることを一つ言葉にする"),"変更と全崩れを同じにしない"),
+    DailyScene("shopping_list","買い物の迷いを、条件で減らす","買い物前に必要な物が増えたとき","売り場で考え始めると、値段・好み・献立を同時に比べることになります","今夜使う物と在庫切れを優先する","買い物は、今夜使う物と在庫切れだけ先にメモする","今日なくて本当に困る物は？",("冷蔵庫を一段だけ確認する","今夜使う物に丸をつける","予定外の品は写真だけ残す"),"選択肢より条件を先に持つ"),
+    DailyScene("request","『できます』と『引き受けます』を分ける","頼まれごとに反射で返事しそうなとき","できる内容でも、期限と所要時間が合わなければ今の予定には入りません","期限・所要時間・代わりの手段を確認する","頼まれごとは、期限と所要時間を聞いてから返事する","引き受ける前に確認したい条件は？",("返事の前に期限を聞く","必要な時間をざっくり見積もる","難しければ代案を一つ伝える"),"親切と即答を同じにしない"),
+    DailyScene("dinner","夕食は、三つの条件で決める","夕食の献立がなかなか決まらないとき","迷っているのは料理ではなく、時間・在庫・片づけの優先順位かもしれません","使える時間・家にある物・洗い物で決める","夕食は、時間・在庫・洗い物の3条件で決める","今夜いちばん減らしたい負担は？",("使える時間を先に決める","家にある主菜候補を一つ見る","洗い物の少ない方を選ぶ"),"献立より今夜の条件を見る"),
+    DailyScene("phone","休む前のスマホに、目的を一つ","休みたいのにスマホを見続けるとき","情報を足し続けると、休憩の時間にも判断が増えていきます","開く前に、見る目的と終える時刻を決める","スマホは、見る目的を一つ決めてから開く","いま必要なのは情報、それとも休息？",("見る用事を一つ言葉にする","終了時刻をタイマーへ入れる","終えたら画面を伏せて置く"),"休憩に判断を持ち込まない"),
+    DailyScene("work_quality","完成の条件を、先に置く","資料の細部ばかり直してしまうとき","修正を続けても、相手の判断材料が増えなければ目的には近づきません","相手が判断に必要な三点で区切る","資料は、相手が判断に必要な3点があれば一度閉じる","この修正で何が決めやすくなる？",("資料の目的を一文で書く","必要な数字を三つ確認する","追加修正は明日の欄へ移す"),"きれいさより判断材料を残す"),
+    DailyScene("tidying","片づけは、部屋より範囲で決める","片づけたい場所が多すぎるとき","対象が広いほど終点が見えず、始める前から負担が大きくなります","十五分で終わる一面だけ選ぶ","片づけは部屋ではなく、机の右半分など範囲で決める","15分で景色を変えられる場所は？",("机の一面だけ空ける","要る・移動・捨てるに分ける","15分で途中でも終える"),"広さではなく終点を決める"),
+    DailyScene("other_mood","相手の表情と、自分の想像を分ける","相手の機嫌が気になったとき","見えた表情は事実でも、その理由まで自分の責任とは限りません","観察したこと・解釈・望むことを分ける","相手の表情は事実、理由は推測。二つを分けて考える","いま確かに分かっていることは何？",("見えた事実を一行で書く","自分の解釈を別の行へ書く","必要なら短く確認する"),"分からない理由を背負わない"),
+    DailyScene("impulse_buy","欲しい気持ちと、今日買う判断を分ける","予定外の買い物を迷っているとき","欲しいことは本当でも、必要性と買う時期は別に考えられます","今日使うか・予算内か・代用品があるかで決める","予定外の買い物は、今日使うか・予算内かで決める","明日でも欲しいと言えるもの？",("価格と使う日をメモする","家の代用品を一つ思い出す","迷う物は24時間保留する"),"欲しいと今買うを分ける"),
+    DailyScene("rest","休憩を、残った時間へ回さない","休みたいのに予定を詰めてしまうとき","休憩を用事の後へ置くと、用事が延びるたびに消えていきます","休み始める時刻を先に固定する","休憩は空いたらではなく、始める時刻を予定へ入れる","今日は何時から休む？",("休み始める時刻を決める","その10分前にアラームを置く","終わらない用事を一つ翌日へ送る"),"休息を余り時間にしない"),
+    DailyScene("group_chat","通知の数と、必要な情報を分ける","グループLINEの通知が多いとき","メッセージの量が多くても、自分が判断する項目は数件だけかもしれません","決定事項・質問・雑談の三つに分けて読む","グループLINEは、決定事項・質問・雑談に分けて読む","自分が返す必要のある質問はどれ？",("決定事項だけ先に拾う","自分宛ての質問へ印をつける","雑談は読む時刻を後にする"),"通知量を仕事量にしない"),
+    DailyScene("family_roles","家族の予定を、役割まで言葉にする","家族の送迎や連絡が重なるとき","時刻だけ共有しても、誰が動くか曖昧なら直前に負担が集まります","誰が・何時までに・何をするかを決める","家族の予定は、誰が・何時までに・何をするかの3点にする","まだ担当が決まっていない用事は？",("予定に担当者の名前を足す","出発時刻を家族で確認する","一つだけ代わりを頼む"),"予定ではなく役割まで共有する"),
+    DailyScene("searching","探し物は、範囲を広げる前に戻る","出かける直前に物が見つからないとき","焦るほど同じ場所を何度も見て、探す範囲だけが広がります","最後に使った場面から三か所に絞る","探し物は、最後に使った場所から3か所だけ見る","最後にそれを使ったのはいつ？",("最後に使った場面を思い出す","候補を三か所だけ書く","三か所になければ代用品を選ぶ"),"焦りより探索範囲を小さくする"),
+    DailyScene("meeting","話し合いを、決める一文から始める","相談や話し合いが長引きそうなとき","共有と決定を同時にすると、話題が増えて終点が見えにくくなります","今日決めることを一文にする","話し合いは、今日決めることを一文にしてから始める","この時間で決めるのは何？",("決めることを一文で書く","情報共有は三点までにする","残った話題は次回へ分ける"),"話す量より終点を共有する"),
+    DailyScene("low_energy","少ない気力で、予定を組み直す","朝から思うように気力が出ないとき","使える力が少ない日に通常量を求めると、重要なことまで途中になります","必須・延期・頼めるものの三列に分ける","今日は必須・延期・頼めるの3列で予定を組み直す","今日、守れたら十分なことは？",("今日必須の一つへ丸をつける","延期するものを予定から外す","頼める用事を一つ伝える"),"能力ではなく今日の配分を見る"),
+    DailyScene("day_off","休日に、空白を先に予約する","休みの日へ予定を詰め込みそうなとき","空白を残り時間にすると、休日まで用事を消化する日になります","外出を一つに絞り、何もしない時間を先に取る","休日は外出を一つに絞り、何もしない2時間を先に取る","今日、予定にしない時間はどこ？",("外出の目的を一つ決める","移動をまとめられるか確認する","何もしない2時間を先に確保する"),"休みを予定のすき間にしない"),
+    DailyScene("subscription","月額の小ささと、年間の支出を分ける","使っていないサブスクを見つけたとき","月額が小さく見えても、判断したいのは一年で払う金額と実際に使った回数です","年間額・利用回数・代わりの手段で決める","サブスクは月額ではなく、年間額と直近の利用回数を見る","先月、そのサービスを何回使った？",("月額を12倍して書く","直近30日の利用回数を見る","次に使う日がなければ解約候補へ"),"安さより使った事実で決める"),
+    DailyScene("laundry","洗濯物の山を、工程に分ける","洗濯物がたまって手をつけにくいとき","洗う・干す・畳むを一つの仕事だと思うと、必要な時間を大きく見積もってしまいます","今できる一工程だけ終える","洗濯は、洗う・干す・戻すのうち一工程だけ決める","今の10分で終えられる工程は？",("一回分だけ洗濯機へ入れる","干す場所を先に空ける","畳まない物は定位置へ戻す"),"家事は工程まで小さくする"),
+    DailyScene("morning_rush","朝の遅れを、全部の失敗にしない","出発前に予定より遅れているとき","五分の遅れを取り戻そうとして判断を急ぐと、忘れ物や連絡漏れが増えやすくなります","出発時刻・必需品・連絡の三つを守る","朝は、出発時刻・必需品・必要な連絡だけを先に守る","省いても困らない支度はどれ？",("出発できる時刻を決め直す","鍵・財布・スマホを確認する","遅れる相手へ先に連絡する"),"遅れた時間より守る条件を見る"),
+    DailyScene("appointment","通院や予約を、前日から軽くする","予約のある日に落ち着かないとき","予定そのものより、持ち物・移動・待ち時間が未確定なことが負担を増やします","時刻・場所・持ち物を前日に確定する","予約は、時刻・場所・持ち物を前日に一画面へまとめる","明日の自分が迷う情報はどれ？",("予約画面をスクリーンショットする","家を出る時刻を逆算する","必要な物を玄関へ置く"),"不安は情報の未確定を減らす"),
+    DailyScene("email","長いメールを、相手の判断順に並べる","仕事の連絡が長くなってしまうとき","説明したい順と、相手が判断しやすい順は同じとは限りません","結論・理由・依頼の順で三段にする","メールは、結論・理由・してほしいことの順で書く","相手に最初に決めてほしいことは？",("結論を一文目へ移す","理由は三点までに絞る","返信期限を最後に添える"),"情報量より判断の順番を渡す"),
+    DailyScene("reversible","大きな決断を、戻せる部分まで小さくする","新しい選択に踏み切れないとき","一度で最終決定しようとすると、失敗の負担を実際より大きく感じます","試用・仮決定・本決定の三段階にする","迷う選択は、まず一週間だけ試せる形に変える","失敗しても戻せる範囲はどこ？",("試す期間を一週間に区切る","変える条件を一つだけにする","続ける基準を先に書く"),"決断より小さな実験に変える"),
+)
+
+SCENE_OFFSETS={"morning":0,"noon":4,"evening":16,"night":8}
+PLANET_TOPICS={"月":"気分","太陽":"優先順位","水星":"連絡","金星":"好みと対人","火星":"行動","木星":"拡大","土星":"責任","天王星":"変化","海王星":"想像","冥王星":"こだわり"}
+ASPECT_LOGIC={
+    "コンジャンクション":"二つを広げず、目的を一つに",
+    "セクスタイル":"待つより、小さく試してみる",
+    "スクエア":"同時進行より、順番を決める",
+    "トライン":"進みやすい日は、終点を決める",
+    "オポジション":"片方を消さず、時間を分ける",
+}
+ASPECT_DYNAMICS={
+    "コンジャンクション":"{themes}が同じ方向へ集まりやすい",
+    "セクスタイル":"{themes}を小さく試してつなげやすい",
+    "スクエア":"{themes}が引っ張り合い、同時に満たそうとすると疲れやすい",
+    "トライン":"{themes}が自然につながり、いつもより進めやすい",
+    "オポジション":"{themes}が両端に分かれ、片方だけでは納得しにくい",
+}
+EVERYDAY_TERMS=("LINE","返信","予定","家族","買い物","夕食","スマホ","資料","片づけ","相手","予算","休憩","通知","送迎","探し物","話し合い","仕事","外出","用事","ToDo","頼まれごと","献立","休日","気力","習慣","道具","朝","メール","進路","電車","サブスク","資格","進捗","通院","予約","洗濯","選択","一週間")
+REASONING_TERMS=("事実","推測","締切","期限","基準","分け","決め","先に","最後","ほど","より","別","優先","条件","終点","理由","同時","目的","時刻","時間","所要時間","範囲","担当","必要","必須","延期","三点","三列","二軸","材料","確認","選ぶ","戻れる","比べ","完了","終える","続けない","試す")
+BANNED_GENERIC_COPY=("今できることをひとつ","ひと呼吸おいて観察","本当に必要なことが見えて","気づきが、次の一手")
+TAROT_KNOWLEDGE_TERMS=("カード","絵柄","アルカナ","スート","数字","色","視線","背景","象徴","逆位置","質問","スプレッド","組み合わせ","直感")
+TAROT_OMASU_NOTE_TERMS=("カード","絵","背景","目線","近景","遠景","動物","植物","アルカナ","ワンド","カップ","ソード","ペンタクル","数字","色","逆位置","質問","一枚","三枚","席","意味","直感","事実","解釈")
+TAROT_HISTORY_TERMS=("15世紀","18世紀","19世紀","1909年","初期","遊戯","ゲーム","スート札","切り札","RWS版","後世","占術")
+
+SEASON_NOTES={
+    "春分":"昼と夜の長さが近づき、予定の配分を見直しやすい頃。",
+    "清明":"光が明るくなり、窓辺や玄関を整えたくなる頃。",
+    "穀雨":"やわらかな雨が増え、衣類と傘の置き場を整える頃。",
+    "立夏":"日差しの強さに、初夏の支度を始める頃。",
+    "小満":"草木の勢いが増え、暮らしの中の成長に気づく頃。",
+    "芒種":"雨と湿気に備え、乾かし方を工夫したい頃。",
+    "夏至":"明るい時間が長く、夕方の使い方を見直す頃。",
+    "小暑":"暑さが本格化する前に、休憩と水分を予定へ入れる頃。",
+    "大暑":"体力を基準に、予定を減らす判断が必要な頃。",
+    "立秋":"朝晩の風や空の高さに、夏の出口が混じり始める頃。",
+    "処暑":"残暑の中にも、眠りやすい夜が少しずつ戻る頃。",
+    "白露":"朝の空気が変わり、羽織る物を用意し始める頃。",
+    "秋分":"昼夜の釣り合いを目印に、生活時間を整える頃。",
+    "寒露":"朝晩の冷えを感じ、寝具や飲み物を温かくする頃。",
+    "霜降":"冷え込む日が増え、足元と首元を守り始める頃。",
+    "立冬":"冬の入口。暖房や厚手の衣類を点検する頃。",
+    "小雪":"冷たい雨が増え、帰宅後の温め方を決めておく頃。",
+    "大雪":"移動時間に余白を足し、冬の遅れへ備える頃。",
+    "冬至":"夜が長い節目。休む時間を先に確保したい頃。",
+    "小寒":"寒さが続く前提で、朝の支度を簡単にする頃。",
+    "大寒":"一年でも寒い時期。頑張る量より回復を優先する頃。",
+    "立春":"寒さの中に、光と時間の小さな変化を探す頃。",
+    "雨水":"雪が雨へ変わり、足元や外出の準備を替える頃。",
+    "啓蟄":"土の気配が動き、止めていたことを小さく再開する頃。",
+}
+
+
+@dataclass(frozen=True)
+class TarotCard:
+    number:int
+    name:str
+    core:str
+    misread:str
+    everyday:str
+    action:str
+    question:str
+
+
+TAROT_CARDS=(
+    TarotCard(0,"愚者","準備が揃う前でも、小さく試せる自由","無計画を勧めるカードではありません。戻れる一歩かを確かめます","新しい習慣なら、道具を買う前に10分だけ試す","失敗しても戻せる一歩を一つ決める","試すだけなら、今日何ができる？"),
+    TarotCard(1,"魔術師","手元の道具を組み合わせ、最初の形をつくる力","何でもできるという意味ではありません。使える時間と材料を数えます","仕事の資料なら、新しい情報探しより手元の数字で一枚作る","使える物・時間・相手を三つ書く","もう持っている材料は何？"),
+    TarotCard(2,"女教皇","答える前に、事実と違和感を静かに読む姿勢","黙って耐えることではありません。まだ決めない判断も選択です","LINEの文面が気になるなら、相手の意図を決めつけず事実だけ読む","事実・推測・確認したいことを分ける","まだ分からないことは何？"),
+    TarotCard(3,"女帝","育てるために、時間と手間を適切に注ぐ力","甘やかすこととは別です。増やす対象を一つに絞ります","夕食を整えたいなら、品数より温かい一品を丁寧に作る","今日育てる一つへ30分を使う","手をかける価値があるものは？"),
+    TarotCard(4,"皇帝","役割と境界を決め、続けられる形をつくる力","すべてを支配するカードではありません。担当を曖昧にしない姿勢です","家族の予定は、誰が何時までに動くかまで決める","担当・期限・完了条件を一行にする","決めておくと楽になる境界は？"),
+    TarotCard(5,"教皇","経験から生まれた型を借り、迷う回数を減らす知恵","常識へ無条件に従う意味ではありません。型が目的に合うかを見ます","朝の支度は、毎日同じ順番にして忘れ物を減らす","繰り返す用事の手順を三つにする","自分を助ける定番は何？"),
+    TarotCard(6,"恋人","正解探しより、自分が大切にする基準を選ぶ力","恋愛だけのカードではありません。選択と合意が中心です","買い物で迷ったら、安さと長く使うことのどちらを優先するか決める","選ぶ条件を二つまでに絞る","今回は何を優先したい？"),
+    TarotCard(7,"戦車","進む方向を一つに絞り、力を同じ向きへ使うこと","勢いだけで押し切る意味ではありません。止まる条件も必要です","用事が多い日は、午前中に終える一件だけ先に決める","目的地と終了時刻を先に置く","今日どこまで進めば十分？"),
+    TarotCard(8,"力","強く押さえつけず、扱える大きさへ整える力","我慢し続けることではありません。感情を消さず行動を選びます","腹が立つメールは、すぐ送らず要望を一文に直してから返す","感情と伝えたい要望を別に書く","本当は何を変えてほしい？"),
+    TarotCard(9,"隠者","情報を増やす前に、自分の経験へ戻る時間","孤立を勧めるカードではありません。一人で考える期限を決めます","進路を迷うなら、検索前に過去に続いた仕事の条件を書く","15分だけ一人で考え、その後相談する","経験が教えている条件は何？"),
+    TarotCard(10,"運命の輪","変えられない流れと、今選べる対応を分ける視点","幸運を待つだけのカードではありません。変化への準備を促します","電車の遅れは変えられなくても、連絡と予定の順番は変えられる","変えられることを一つだけ動かす","今、自分で選べる部分はどこ？"),
+    TarotCard(11,"正義","気分ではなく、同じ基準で条件を比べる姿勢","冷たく裁くことではありません。判断材料を揃えるカードです","頼まれごとは、相手によらず期限と所要時間を確認してから返事する","賛成と反対の根拠を一つずつ書く","同じ条件ならどう決める？"),
+    TarotCard(12,"吊るされた男","動けない時間を、見方を変える時間へ使うこと","犠牲になり続ける意味ではありません。待つ期限を決めます","返事待ちの仕事は、催促を重ねず別に進められる作業へ移る","待つ期限と次の行動を決める","止まっている間に何が見える？"),
+    TarotCard(13,"死神","役目を終えたものを閉じ、次の余白をつくる力","不幸や死の予告ではありません。終了と切り替えの象徴です","使わないサブスクを解約し、毎月の固定費を一つ減らす","続けないものを一つ正式に終える","もう役目を終えたものは？"),
+    TarotCard(14,"節制","違う要素を少しずつ混ぜ、無理のない配分を探す力","ただ中間を選ぶ意味ではありません。試して調整する姿勢です","仕事と休憩を、50分と10分のように時間で分ける","一度に変えず、配分を一割だけ動かす","何と何の配分を変えたい？"),
+    TarotCard(15,"悪魔","やめたいのに続く仕組みと、目先の快楽を見る視点","悪い出来事の予告ではありません。選べない構造への気づきです","寝る前のスマホは、意志より充電場所を寝室の外へ変える","誘惑が始まる場所を一つ変える","意志以外で変えられる仕組みは？"),
+    TarotCard(16,"塔","崩れた前提を認め、事実から組み直す力","必ず災難が起こるという意味ではありません。無理な前提の見直しです","予定変更が入ったら、一日全部でなく固定予定だけ残して組み直す","変わった事実と残る条件を分ける","もう成立していない前提は？"),
+    TarotCard(17,"星","遠い希望を、今日確かめられる目印へ変える力","願えば叶うという意味ではありません。進む方向を見失わない印です","資格の勉強なら、合格だけでなく今週解くページ数を決める","希望を一週間の行動へ翻訳する","今週、何で前進を確かめる？"),
+    TarotCard(18,"月","見えにくい時に、推測を事実として扱わない慎重さ","不安が現実になるという意味ではありません。曖昧さを示すカードです","相手の表情が気になっても、理由を決めつけず必要なら短く確認する","見た事実と想像を二列に分ける","確かに分かっていることは何？"),
+    TarotCard(19,"太陽","見えている成果を共有し、次の力へ変える明るさ","いつでも前向きでいる命令ではありません。分かりやすさと確認です","仕事の進捗は、できていない点より終えた三点を先に共有する","終えたことを具体的に三つ数える","すでに明らかな成果は何？"),
+    TarotCard(20,"審判","過去の経験を呼び戻し、今の判断へ使うこと","誰かに裁かれるカードではありません。再評価と再開の象徴です","以前続かなかった習慣は、失敗ではなく止まった条件を確認する","過去の方法から一つだけ改善する","やり直すなら何を変える？"),
+    TarotCard(21,"世界","完了を認め、次へ持ち越さない区切り","完璧になるという意味ではありません。必要十分で閉じる力です","資料は目的・数字・依頼が揃ったら、装飾を足さず提出する","完成条件を三つ満たしたら閉じる","今日は何を完了と呼べる？"),
+)
+
+TAROT_SYMBOLS=(
+    "白い花＝まっさらな意図／犬＝本能の注意／崖＝戻れる範囲の境界",
+    "机上の道具＝手元の資源／上向きの手＝意図／足元の花＝具体化",
+    "二本の柱＝二つの見方／巻物＝まだ開かれていない情報／月＝直感",
+    "実る庭＝育成／冠＝受け取る力／流れる水＝めぐりと余裕",
+    "石の椅子＝安定した枠／山＝責任／四角い形＝仕組み",
+    "二人の弟子＝受け継ぐ知恵／鍵＝理解への入口／手の印＝型",
+    "二人と道＝選択／天使＝価値観／木＝選んだ後に育つ結果",
+    "二頭の動物＝異なる力／車輪＝進行／星の冠＝方向を示す目標",
+    "獅子＝強い感情／輪の形＝持続／やさしい手＝力の扱い方",
+    "灯り＝自分で確かめた経験／杖＝足場／山道＝一人で考える時間",
+    "回る輪＝変化／四方の存在＝変わらない条件／雲＝予測不能",
+    "天秤＝比較する基準／剣＝切り分ける判断／正面の姿勢＝公平さ",
+    "逆さの視点＝見方の転換／片足の形＝一時停止／光輪＝気づき",
+    "白い花＝次へ残す種／朝日＝切り替え／倒れた冠＝終えた役割",
+    "二つの器＝配分／流れる水＝調整／片足ずつの姿勢＝試行",
+    "鎖＝習慣の仕組み／松明＝目先の刺激／ゆるい輪＝外せる選択",
+    "崩れる塔＝成立しない前提／稲妻＝突然の事実／落ちる冠＝見直し",
+    "大きな星＝方向／水を注ぐ姿＝小さな継続／裸足＝等身大",
+    "二匹の動物＝本能の警戒／曲がる道＝不確実さ／月明かり＝部分情報",
+    "太陽＝明らかさ／白い馬＝素直な力／ひまわり＝見えている成果",
+    "呼びかける音＝再評価／開く箱＝過去からの再開／旗＝判断の合図",
+    "輪＝完了／四隅の存在＝全体像／二本の杖＝次へ持ち運ぶ経験",
+)
+
+
+@dataclass(frozen=True)
+class TarotTopic:
+    key:str
+    category:str
+    title:str
+    card_number:int
+    notes:str
+    origin:str
+    core:str
+    method:str
+    humor:str
+
+
+# Historical summaries below distinguish the original card game from later
+# divinatory interpretations. Sources: V&A and The Metropolitan Museum of Art.
+# https://www.vam.ac.uk/articles/tarot-cards
+# https://www.metmuseum.org/perspectives/tarot-2
+# https://www.metmuseum.org/perspectives/suits-and-decks
+TAROT_TOPICS=(
+    TarotTopic(
+        "picture_map","絵柄の読み方","絵柄は、意味の地図",0,
+        "白い花＝まっさらな意図／犬＝本能の注意／崖＝戻れる範囲の境界",
+        "15世紀の遊戯用タロットでは、愚者（マット）は21枚の切り札とは別の特別札でした。RWS版の旅人の図像は、定位置の外から始まる可能性を読む手がかりです。",
+        "人物・背景・色・向きは、別々の飾りではなく、一つの状況をつくっています。",
+        "全体の印象→最初に目へ入ったもの→違和感、の順で見る。意味を暗記する前に、絵の中で何が起きているかを一文にします。",
+        "私は『人物→背景→違和感』の順で確認します。意味より先に、絵の中の事実を三つ拾うのが読みの土台です。",
+    ),
+    TarotTopic(
+        "major_minor","カードの構成","大アルカナと小アルカナ",21,
+        "大アルカナ＝人生の節目／小アルカナ＝日々の具体場面／両方＝質問で焦点が変わる",
+        "15世紀の基本構成は56枚のスート札、21枚の切り札、愚者1枚。大・小アルカナという呼び名は、19世紀の神秘思想の中で広まりました。",
+        "大アルカナは大きなテーマ、小アルカナはそのテーマが日常でどう動くかを細かくします。",
+        "大アルカナだけで結論を急がず、小アルカナが示す人物・行動・時間の情報を重ねて読みます。",
+        "私は大アルカナを方針、小アルカナを現場と読みます。方針だけでは、今日の行動までは決まりません。",
+    ),
+    TarotTopic(
+        "four_suits","小アルカナ","四つのスートは担当部署",14,
+        "ワンド＝意欲と行動／カップ＝感情と関係／ソード＝思考と言葉",
+        "剣・杯・貨幣・棍棒は15世紀イタリアの遊戯札のスートです。思考・感情・現実・行動という対応は、後世の占術で整理された読みです。",
+        "ペンタクルを加えた四つのスートは、同じ出来事を別の担当領域から説明します。",
+        "質問の中で、行動・感情・思考・現実条件のどこが詰まっているかを見てからスートを読みます。",
+        "私はワンド＝動機、カップ＝感情、ソード＝判断、ペンタクル＝実行条件と分け、欠けた部署を探します。",
+    ),
+    TarotTopic(
+        "numbers","数の読み方","数字は、話の進み具合",10,
+        "1＝始まり／5＝揺れと調整／10＝一区切り",
+        "初期の数札は、同じスート記号を枚数分並べて値を示しました。数字を心理的な進行段階として読む方法は、後世の占術的な解釈です。",
+        "数字は吉凶の点数ではなく、物事が始まりから完了へ進む途中の段階を示します。",
+        "カード名を忘れても、数字とスートを組み合わせれば『何の話が、どこまで進んだか』を組み立てられます。",
+        "数字は点数ではなく進捗率。私は『始まった・揺れている・まとまった』のどこかを先に見ます。",
+    ),
+    TarotTopic(
+        "court_cards","人物の読み方","コートカードは人か、態度か",4,
+        "ペイジ＝学ぶ姿勢／ナイト＝動かす力／クイーン・キング＝成熟した扱い方",
+        "15世紀の56枚には王・女王・騎士・従者の4人札があり、当時の宮廷社会の序列を映していました。現代では役割や成熟度にも読み替えます。",
+        "コートカードは特定の誰かだけでなく、その場で求められる役割や態度としても読めます。",
+        "『誰のこと？』で止まったら、『いま自分に必要な振る舞いは？』へ質問を変えてみます。",
+        "人物を当てる前に、そのカードの役割を自分へ戻します。誰か探しを始めると、読みが他人任せになります。",
+    ),
+    TarotTopic(
+        "colors","色の読み方","色は、場面の温度を伝える",17,
+        "赤＝熱と行動／青＝思考と静けさ／黄＝意識と明るさ",
+        "初期の手描き札や木版札は、時代・地域・制作者で配色が異なります。色は万能の辞書ではなく、同じデッキ内で比較するのが安全です。",
+        "色は一色だけで断定せず、どの場所に、どれくらい使われているかを比較します。",
+        "人物より背景の色が強いなら、個人の気持ちより環境の影響が大きい、という仮説を置けます。",
+        "色は単独で決めず、面積と場所で比較します。赤が多いより、赤が人物と背景のどちらにあるかが大事です。",
+    ),
+    TarotTopic(
+        "gaze_pose","人物の読み方","視線と姿勢は、意識の向き",2,
+        "右向き＝これから／左向き＝過去や内側／正面＝いま向き合うもの",
+        "1909年のRWS版は、パメラ・コールマン・スミスが数札まで人物と場面を描きました。視線や姿勢を読む方法が広がった大きな転換点です。",
+        "視線・足・手が同じ方向なら意図と行動がそろい、別方向なら迷いや分裂を読み取れます。",
+        "人物が何を見て、何から背を向け、手に何を持つかを順番に言葉へします。",
+        "私は目線→足→手の順で見ます。三つが違う方向なら、意図・行動・手段がまだ揃っていないと読みます。",
+    ),
+    TarotTopic(
+        "background","背景の読み方","背景は、無言の状況説明",18,
+        "山＝越える課題／水＝感情の流れ／道＝選択と時間",
+        "初期の数札は記号の反復が中心でした。RWS版で背景を含む場面が数札にも加わり、『なぜその状態か』を絵から読めるようになりました。",
+        "人物だけを見ると性格診断になりますが、背景を見ると『なぜ今そうしているか』が見えてきます。",
+        "近景は今すぐ扱えること、遠景は時間のかかること、と距離を手がかりに整理します。",
+        "近景は今扱えること、遠景は時間がかかること。背景は、カードの時間軸を黙って教えています。",
+    ),
+    TarotTopic(
+        "living_symbols","象徴の読み方","動物と植物は、本能の字幕",8,
+        "犬＝警戒と忠実さ／鳥＝視点と知らせ／花や実＝育った結果",
+        "RWS版の動植物は、場面の感情や反応を補う視覚言語として働きます。ただし象徴は固定せず、人物との距離や動きから読みます。",
+        "生き物は、人物が言葉にしていない本能・成長・反応を補足する記号として働きます。",
+        "動物が人物へ近づくか離れるか、植物が芽か実かを見て、反応と成長段階を読みます。",
+        "動物は反射、植物は成長段階。人物の説明だけで足りない感情を、生き物の動きで補います。",
+    ),
+    TarotTopic(
+        "reversal","正逆位置","逆位置は、単純な反対ではない",12,
+        "弱まる＝力が出にくい／偏る＝やりすぎる／内向き＝外へ出ていない",
+        "逆位置は15世紀の遊戯規則に由来する意味ではなく、カードが占術化した後に発達した読法です。採用しないデッキや読み手もいます。",
+        "逆位置は悪い意味へ反転させるのではなく、正位置の力がどのように詰まったかを見ます。",
+        "まず正位置の核を言葉にし、その力が不足・過剰・内向きのどれかを質問と照合します。",
+        "逆位置は『悪い』ではなく、不足・過剰・内向きの三択から考えると、読みが急に整理されます。",
+    ),
+    TarotTopic(
+        "question_design","質問のつくり方","質問が変わると、カードも働く",11,
+        "未来は？＝範囲が広い／何を見落としている？＝観察／次の一歩は？＝行動",
+        "質問設計は、18世紀末以降にカードが占術へ使われる中で発達した実践です。元の遊戯札に『正しい質問』の規則があったわけではありません。",
+        "タロットは質問の範囲に答えるため、曖昧な質問には曖昧な読みが返りやすくなります。",
+        "期限・相手・知りたいことを一つずつ入れ、『自分が選べる部分』を残した質問にします。",
+        "質問には期限・対象・選べる行動を入れます。問いがぼんやりなら、カードも仕事の範囲を決められません。",
+    ),
+    TarotTopic(
+        "one_card","スプレッド","一枚引きは、短いから難しい",9,
+        "質問＝焦点／絵柄＝根拠／一文＝結論",
+        "一枚引きは、遊戯としてのタロットではなく、後世のカード占いで整えられた読法です。少ない情報を質問の焦点で絞る方法です。",
+        "一枚引きは情報が少ない分、何でも読める余地が広く、質問の精度がそのまま出ます。",
+        "カードの単語を並べず、『この質問に対して、この絵のどこを根拠に、何を言うか』を一文にします。",
+        "一枚引きでは、根拠を一つに絞ります。全部の意味を入れるより、この質問に効く一語を選ぶ方が正確です。",
+    ),
+    TarotTopic(
+        "three_cards","スプレッド","三枚引きは、役割を先に決める",20,
+        "原因・現在・対応／状況・障害・助言／自分・相手・関係",
+        "三枚引きも15世紀のゲーム規則ではなく、後世の占術実践です。過去・現在・未来など、位置へ役割を与えて関係を読みます。",
+        "三枚の意味を別々に読むより、各位置の役割を決めて関係性を見る方が話がまとまります。",
+        "引く前に三つの位置名を書き、最後に『だから何をするか』を一文でまとめます。",
+        "三枚はカードより先に席を決めます。席順のない三枚は、全員が同時に説明を始める会議のようなものです。",
+    ),
+    TarotTopic(
+        "spread_position","スプレッド","同じカードでも、席が違えば仕事が違う",6,
+        "原因の席＝背景／障害の席＝詰まり／助言の席＝使い方",
+        "スプレッドは占術化したタロットで発達した配置法です。カード固有の意味に、位置が説明する役割を重ねる仕組みです。",
+        "カードの意味は固定語ではなく、質問とスプレッド上の位置によって役割が変わります。",
+        "カードを見る前に位置名を読み、その席で何を説明するカードなのかを決めます。",
+        "同じカードでも原因席なら背景、助言席なら使い方。私はカード名より、まず担当業務を確認します。",
+    ),
+    TarotTopic(
+        "combinations","組み合わせ","二枚は、共通点と差分で読む",10,
+        "共通の色＝強まるテーマ／同じ向き＝流れの一致／対立する元素＝調整点",
+        "本来のゲームでは札同士の強弱や組み合わせが勝敗を作りました。占術ではその関係性を、共通点と差分の物語へ置き換えます。",
+        "組み合わせは意味の足し算ではなく、二枚が同じことを言う部分と食い違う部分を比べます。",
+        "共通点を一つ、差分を一つ、二枚をつなぐ動詞を一つ選ぶと文章がまとまります。",
+        "二枚は共通点・差分・つなぐ動詞の三点で読みます。意味を足すより、関係を文章にする方がぶれません。",
+    ),
+    TarotTopic(
+        "context_changes","文脈の読み方","同じカードでも、質問で意味は動く",13,
+        "仕事の質問＝役割や成果／恋愛の質問＝関係や距離／健康の質問＝専門助言を優先",
+        "タロットの象徴は、15世紀の社会・宗教図像から19世紀以降の神秘思想まで層を重ねています。一語の固定意味にできない理由です。",
+        "カードは辞書の一語ではなく、質問に対してどの側面を使うかを選ぶ道具です。",
+        "最初に質問の名詞と動詞を拾い、カードの意味のうち関係する部分だけを使います。",
+        "質問の名詞と動詞を先に拾い、カードの意味を必要な範囲へ絞ります。広げすぎないのが山羊座式です。",
+    ),
+    TarotTopic(
+        "intuition_evidence","読みの組み立て","直感は、絵柄の根拠とセット",2,
+        "第一印象＝仮説／絵柄の要素＝根拠／質問との接続＝結論",
+        "RWS版は数札まで場面化したため、暗記だけでなく絵から仮説を立てる読法を広めました。直感はこの視覚情報を使った入口です。",
+        "直感を否定する必要はありませんが、どの絵柄からそう感じたかを言えれば読みが検証できます。",
+        "感じたことを書いたあと、色・視線・配置のどれが根拠かを一つだけ添えます。",
+        "直感は仮説、絵柄は証拠、質問との接続が結論。三段に分けると、感覚的な読みも検証できます。",
+    ),
+    TarotTopic(
+        "reading_ethics","読みの姿勢","断定より、選べる余地を残す",11,
+        "事実＝今見えていること／解釈＝カードからの仮説／選択＝本人が決めること",
+        "タロットは遊戯札として始まり、占術的意味は後世に加わりました。歴史的にも唯一絶対の解釈はなく、断定より仮説が自然です。",
+        "タロットは未来や他人の気持ちを確定する道具ではなく、状況を別の角度から考える補助線です。",
+        "怖い断定を避け、根拠・別の可能性・本人が選べる行動の三つを言葉にします。",
+        "私は『事実・解釈・選択』を分けます。カードは判決ではなく、本人が決めるための論点整理です。",
+    ),
+)
 
 def _seed(day,slot):return int(hashlib.sha256(f"{day}:{slot}".encode()).hexdigest()[:12],16)
 def _pick(seq,seed,n=0):return seq[(seed*17+n*13)%len(seq)]
+
+def _scene_for(day:date,slot:str,sign:str)->DailyScene:
+    # The scene rotation is independent of the Moon sign. Tying both together can
+    # jump backwards when the Moon changes signs and repeat yesterday's subject.
+    index=(day.toordinal()+SCENE_OFFSETS[slot])%len(DAILY_SCENES)
+    return DAILY_SCENES[index]
+
+def _next_scene(day:date,slot:str,sign:str)->DailyScene:
+    return _scene_for(date.fromordinal(day.toordinal()+1),slot,sign)
+
+def _phase_lens(name:str)->str:
+    if "新月" in name:return "新月期は、始める前に意図を一つ決める段階"
+    if "上弦" in name:return "上弦期は、迷いを小さな実行で確かめる段階"
+    if "満月" in name:return "満月期は、結果を見て残すものを選ぶ段階"
+    if "下弦" in name:return "下弦期は、続けないものを決める段階"
+    if "満ちていく凸" in name:return "満ちる凸月は、足すより仕上げる段階"
+    if "満ちていく" in name:return "満ちる月は、試しながら材料を増やす段階"
+    if "欠けていく凸" in name:return "欠ける凸月は、経験を言葉にして渡す段階"
+    if "欠けていく" in name:return "欠ける月は、次のために余白を戻す段階"
+    return "月の満ち欠けは、行動の量を見直す目印"
+
+def _tarot_topic_for(day:date)->TarotTopic:
+    return TAROT_TOPICS[(day-TAROT_START_DATE).days%len(TAROT_TOPICS)]
+
+def _main_aspect(facts:dict[str,Any])->dict[str,Any]|None:
+    aspects=facts.get("major_aspects") or []
+    return next((item for item in aspects if "月" in item.get("planets",[])),aspects[0] if aspects else None)
+
+def _aspect_explanation(aspect:dict[str,Any]|None,moon:dict[str,Any],phase:dict[str,Any],lens:SignLens)->tuple[str,str]:
+    if not aspect:
+        return f"月は{moon['sign']}、{phase['name']}",lens.logic
+    first,second=aspect["planets"]
+    logic=ASPECT_LOGIC.get(aspect["aspect"],"二つのテーマを分けて考えたい配置")
+    return f"{first}と{second}の{aspect['aspect']}",logic
+
+def _morning_guidance(aspect:dict[str,Any]|None,moon:dict[str,Any],phase:dict[str,Any],lens:SignLens)->str:
+    """Translate only supplied sky facts into a concrete decision lens."""
+    if aspect:
+        first,second=aspect["planets"]
+        if "月" in (first,second):
+            other=second if first=="月" else first
+            themes=f"気分と{PLANET_TOPICS.get(other,other)}"
+        else:
+            themes=f"{PLANET_TOPICS.get(first,first)}と{PLANET_TOPICS.get(second,second)}"
+        dynamic=ASPECT_DYNAMICS.get(aspect["aspect"],"二つのテーマを分けて扱いたい").format(themes=themes)
+        return (
+            f"{first}と{second}の{aspect['aspect']}。{dynamic}配置です。"
+            f"月が{moon['sign']}にある今日は、{lens.tendency}ので、{lens.action}と判断が散りにくくなります。"
+        )
+    phase_lens=_phase_lens(phase["name"]).replace("段階","時期")
+    return (
+        f"月は{moon['sign']}。{phase_lens}。"
+        f"今日は{lens.tendency}ので、{lens.action}と動きやすくなります。"
+    )
+
+def _column_headline(text:str)->str:
+    if "、" in text:
+        return text.replace("、","、\n",1)
+    if "』と『" in text:
+        return text.replace("』と『","』と\n『",1)
+    if "』を" in text:
+        return text.replace("』を","』\nを",1)
+    return text
+
+def _column_copy(scene:DailyScene,sign:str)->str:
+    """Build one continuous, substantial short column without item labels."""
+    opening=COLUMN_SIGN_OPENINGS[sign]
+    closing=COLUMN_CLOSINGS[scene.key]
+    template_index=next(index for index,item in enumerate(DAILY_SCENES) if item.key==scene.key)%4
+    if template_index==0:
+        middle=f"たとえば、{scene.situation}。{scene.logic}。"
+        conclusion=f"今日は『{scene.criterion}』を小さな物差しに、まず{scene.actions[0]}。{closing}"
+        return "\n\n".join((opening,middle,conclusion))
+    if template_index==1:
+        middle=f"その気配は、{scene.situation}に、案外はっきり現れます。{scene.logic}。"
+        conclusion=f"そこで、まず{scene.actions[0]}。{scene.criterion}という順序が、今日の判断を軽くします。{closing}"
+        return "\n\n".join((opening,middle,conclusion))
+    if template_index==2:
+        middle=f"{scene.situation}には、目の前の問題より、考える条件の多さに疲れていることがあります。{scene.logic}。"
+        conclusion=f"今日は、{scene.criterion}ことを判断の軸にして、{scene.actions[0]}。{closing}"
+        return "\n\n".join((opening,middle,conclusion))
+    middle=f"今日この星を暮らしへ下ろすなら、入口は{scene.situation}。{scene.logic}。"
+    conclusion=f"結論を急がず、{scene.criterion}ことを目安に、{scene.actions[0]}。{closing}"
+    return "\n\n".join((opening,middle,conclusion))
+
+def _flatten_text(value:Any)->str:
+    if isinstance(value,str):return value
+    if isinstance(value,dict):return " ".join(_flatten_text(item) for item in value.values())
+    if isinstance(value,(list,tuple)):return " ".join(_flatten_text(item) for item in value)
+    return ""
+
+def validate_content_depth(content:dict[str,Any])->dict[str,Any]:
+    """Fail closed when scheduled copy falls back to vague, template-like language."""
+    slot=content.get("slot")
+    if slot not in {"morning","evening","night"}:
+        return {"passed":True,"checked":False,"reason":"slot_not_scheduled"}
+    text=_flatten_text(content)
+    if not content.get("scene_key"):
+        raise ValueError(f"{slot} copy is missing its daily-life scene")
+    if content.get("content_kind")=="tarot_knowledge":
+        required=("topic_key","category","headline","notes","origin","core","method","humor")
+        missing=[key for key in required if not content.get(key)]
+        if missing:
+            raise ValueError(f"tarot copy is missing required fields: {missing}")
+        forbidden=[key for key in ("question","next_card","series_day") if key in content]
+        if forbidden:
+            raise ValueError(f"tarot knowledge copy contains removed fields: {forbidden}")
+        if not any(term in text for term in TAROT_KNOWLEDGE_TERMS):
+            raise ValueError("tarot copy has no concrete tarot knowledge")
+        if not any(term in content["origin"] for term in TAROT_HISTORY_TERMS):
+            raise ValueError("tarot copy needs a historically grounded origin note")
+        if not any(term in content["humor"] for term in TAROT_OMASU_NOTE_TERMS):
+            raise ValueError("omasu note needs an original tarot-reading rationale")
+        return {
+            "passed":True,
+            "checked":True,
+            "scene_key":content["scene_key"],
+            "copy_version":content.get("copy_version"),
+        }
+    if slot=="morning":
+        if "月" not in content.get("hint",""):
+            raise ValueError("morning guidance needs a supplied sky fact")
+        thinking=content.get("thinking","")
+        if not thinking or "\n" in thinking or any(label in thinking for label in ("考え方｜","動き方｜","問い｜")):
+            raise ValueError("morning guidance needs one continuous next-step paragraph")
+        if "最初の一手" not in thinking:
+            raise ValueError("morning guidance needs one concrete first step")
+    if not any(term in text for term in EVERYDAY_TERMS):
+        raise ValueError(f"{slot} copy has no concrete daily-life term")
+    if not any(term in text for term in REASONING_TERMS):
+        raise ValueError(f"{slot} copy has no decision or reasoning language")
+    vague=[phrase for phrase in BANNED_GENERIC_COPY if phrase in text]
+    if vague:
+        raise ValueError(f"{slot} copy contains vague stock language: {vague}")
+    if slot=="night":
+        column=content.get("column","")
+        paragraphs=column.split("\n\n")
+        if not column or len(column)<180 or len(paragraphs)!=3 or any(not paragraph or "\n" in paragraph for paragraph in paragraphs):
+            raise ValueError("night column needs three prose paragraphs separated by one blank line")
+        item_labels=("星の読み｜","日常の場面｜","考え方｜","判断基準｜","最初の一手｜","今日の一手｜","次回｜")
+        if any(label in column for label in item_labels):
+            raise ValueError("night column must read as prose without item labels")
+    return {
+        "passed":True,
+        "checked":True,
+        "scene_key":content["scene_key"],
+        "copy_version":content.get("copy_version"),
+    }
+
 def solar_term(facts):
     sun=next(x for x in facts["positions"] if x["planet"]=="太陽")
     names={0:"春分",15:"清明",30:"穀雨",45:"立夏",60:"小満",75:"芒種",90:"夏至",105:"小暑",120:"大暑",135:"立秋",150:"処暑",165:"白露",180:"秋分",195:"寒露",210:"霜降",225:"立冬",240:"小雪",255:"大雪",270:"冬至",285:"小寒",300:"大寒",315:"立春",330:"雨水",345:"啓蟄"}
@@ -28,50 +575,47 @@ def solar_term(facts):
 
 def build_slot_content(facts:dict[str,Any],slot:str)->dict[str,Any]:
     if slot not in SLOTS:raise ValueError("unknown slot")
-    day=date.fromisoformat(facts["target_date"]);seed=_seed(day,slot);moon=facts["moon"];phase=facts["moon_phase"];ing=facts.get("moon_ingress");aspect=(facts.get("major_aspects") or [None])[0]
-    tendency,adjust=TEND[moon["sign"]];context=f"月は{moon['sign']} {moon['degree_in_sign']:.1f}度"+(f"。{ing['local_time']}ごろ{ing['to']}へ" if ing else "")
+    day=date.fromisoformat(facts["target_date"]);seed=_seed(day,slot);moon=facts["moon"];phase=facts["moon_phase"];ing=facts.get("moon_ingress")
+    tendency,adjust=TEND[moon["sign"]];lens=SIGN_LENSES[moon["sign"]];scene=_scene_for(day,slot,moon["sign"]);aspect=_main_aspect(facts)
+    context=f"月は{moon['sign']} {moon['degree_in_sign']:.1f}度"+(f"。{ing['local_time']}ごろ{ing['to']}へ" if ing else "")
     if slot=="morning":
         line=f"月は{ing['from']}から、{ing['local_time']}ごろ{ing['to']}へ。" if ing else f"月は一日を通して{moon['sign']}にいます。"
-        qs=("自分のために5分使うなら？","今日、少し軽くできることは？","整える前に、やめられることは？","今日の自分へ何を渡したい？","急がず育てたいことは？","心地よい順番に変えるなら？")
-        return dict(slot=slot,title="きょうの暦と月",term=solar_term(facts),phase=phase["name"],illumination=phase["illumination_percent"],moon_line=line,hint=f"{adjust}。今日は、今できることをひとつ。",question=_pick(qs,seed))
+        term=solar_term(facts)
+        hint=_morning_guidance(aspect,moon,phase,lens)
+        thinking=(
+            f"{scene.criterion}。今日の最初の一手は「{scene.actions[0]}」。"
+            "そこまででいったん区切り、次は終えてから考えます。"
+        )
+        return dict(slot=slot,title="きょうの暦と月",term=term,season_note=SEASON_NOTES[term],phase=phase["name"],illumination=phase["illumination_percent"],moon_line=line,hint=hint,thinking=thinking,question=scene.question,scene_key=scene.key,copy_version=COPY_LIBRARY_VERSION)
     if slot=="noon":
         acts={e:_pick(ACTIONS[e],seed,i) for i,e in enumerate(("火","地","風","水"))}
         return dict(slot=slot,title="疲れた日の、戻り方",subtitle="12星座のセルフケア",lead=f"{context}。{tendency}日だから、元素別に小さく整えて。",actions=acts,footer="星を理由に頑張るより、星を休むきっかけに。")
     if slot=="evening":
-        pool=ACTIONS[ELEMENT[moon["sign"]]];acts=[_pick(pool,seed,i+2) for i in range(3)];sky=f"{aspect['planets'][0]}と{aspect['planets'][1]}の{aspect['aspect']}" if aspect else f"{phase['name']}のリズム"
-        return dict(slot=slot,title="星よみメンテナンス",headline=f"月が{moon['sign']}にいる夕方",sky=sky,context=context,tendency=tendency,adjust=adjust,actions=acts,footer=f"{moon['sign']}の月は、反省より『調整』に使う。\n明日の自分を助ける夕方に。")
-    element=ELEMENT[moon["sign"]]
-    headlines=(
-        "感情は、結論ではない",
-        "反応と選択のあいだ",
-        "迷いは、止まる理由ではない",
-        "整えるとは、減らすこと",
-        "気分と事実を、分けてみる",
-        "小さな違和感を、観察する",
-        "正しさより、選び直せる余白",
-        "考える前に、気づいてみる",
-    )
-    logic={
-        "火":"動きたい気持ちは推進力。ただし、勢いと優先順位は別です。",
-        "地":"整えたい気持ちは安定を求めるサイン。完璧さと必要十分は別です。",
-        "風":"考えが増えるのは視点が動いている証拠。情報量と納得感は別です。",
-        "水":"感情は、守りたいものを知らせる情報。気分と事実は別です。",
-    }
-    practices=(
-        "すぐ反応せず、ひと呼吸おいて観察する。その小さな余白が、今日の選択を整えます。",
-        "答えを急がず、いま起きていることを一度そのまま見る。気づきが、次の一手を静かにします。",
-        "足す前に、ひとつ手放せるものを探す。余白ができると、本当に必要なことが見えてきます。",
-        "良い悪いを決める前に、感情へ名前をつける。それだけで、反応は少し選択に変わります。",
-    )
-    endings=(
-        "今日の視点｜反応の前に、ひと呼吸。",
-        "今日の視点｜気分と事実を、分けてみる。",
-        "今日の視点｜答えより、まず観察を。",
-        "今日の視点｜足す前に、ひとつ減らす。",
-    )
-    astrology=f"月が{moon['sign']}を進む午前は、{tendency}。"
-    paragraphs=[astrology,logic[element],_pick(practices,seed,1)]
-    return dict(slot=slot,title="星と心のミニコラム",number=day.toordinal(),headline=_pick(headlines,seed),context=context,paragraphs=paragraphs,ending=_pick(endings,seed,2))
+        if day>=TAROT_START_DATE:
+            topic=_tarot_topic_for(day);card=TAROT_CARDS[topic.card_number]
+            return dict(
+                slot=slot,
+                content_kind="tarot_knowledge",
+                title="タロットノート",
+                subtitle="絵柄・数字・色を、構造で読む",
+                topic_key=topic.key,
+                category=topic.category,
+                card_number=card.number,
+                card_name=card.name,
+                headline=topic.title,
+                notes=topic.notes,
+                origin=topic.origin,
+                core=topic.core,
+                method=topic.method,
+                humor=topic.humor,
+                scene_key=f"tarot_topic_{topic.key}",
+                copy_version=COPY_LIBRARY_VERSION,
+            )
+        sky,sky_logic=_aspect_explanation(aspect,moon,phase,lens)
+        actions=[scene.actions[1],scene.actions[2],lens.action]
+        return dict(slot=slot,title="星よみメンテナンス",headline=scene.headline,sky=sky,context=sky_logic,tendency=scene.situation,adjust=scene.actions[0],actions=actions,footer=f"{scene.ending}。",scene_key=scene.key,copy_version=COPY_LIBRARY_VERSION)
+    column=_column_copy(scene,moon["sign"])
+    return dict(slot=slot,title="暮らしと思考のミニコラム",number=(day-TAROT_START_DATE).days%len(DAILY_SCENES)+1,headline=_column_headline(scene.headline),context=context,column=column,paragraphs=column.split("\n\n"),scene_key=scene.key,copy_version=COPY_LIBRARY_VERSION)
 
 def _text(d,xy,text,font,fill=INK,width=None,gap=14):
     lines=_wrap_text(d,text,font,width) if width else text.splitlines();x,y=xy
@@ -102,4 +646,5 @@ def _night(d,c,day,fp):
     top=min(y+12,1640);d.rounded_rectangle((80,top,1000,min(top+130,1770)),8,outline=NAVY,width=2);f=_font(fp,34);d.text(((WIDTH-d.textlength(c["ending"],font=f))/2,min(y+48,1675)),c["ending"],font=f,fill=NAVY);_footer(d,fp)
 def render_slot_story(content,day,output_path):
     from .story_quality import render_approved_story
+    validate_content_depth(content)
     return render_approved_story(content,day,output_path)

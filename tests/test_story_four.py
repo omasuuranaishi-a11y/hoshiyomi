@@ -1,15 +1,18 @@
 from datetime import date,timedelta
 from pathlib import Path
 import pytest
-from PIL import Image,ImageChops,ImageStat
+from PIL import Image,ImageChops,ImageDraw,ImageStat
 import backend.story_automation_four as automation
-from backend.story_four import SLOTS,build_slot_content,render_slot_story,solar_term
+from backend.story_four import SLOTS,TAROT_START_DATE,TAROT_TOPICS,build_slot_content,render_slot_story,solar_term,validate_content_depth
 from backend.story_quality import (
     MOBILE_BODY_MIN,
     MOBILE_SUPPORT_MIN,
     MORNING_BODY_MIN,
     _apply_daily_palette,
     _decorate,
+    _gothic_font,
+    _handwritten_gothic_font,
+    _wrap_kinsoku,
     design_variant,
     validate_layout_regions,
     validate_story_asset,
@@ -33,13 +36,94 @@ def test_four_slots_render(tmp_path):
         with Image.open(path) as image:
             assert image.size == (1080, 1920)
 
-def test_content_never_repeats_for_sample_period():
-    seen=set()
-    for offset in range(120):
+def test_daily_life_scenes_rotate_for_twenty_four_days():
+    for slot in ("morning","night"):
+        keys=[]
+        for offset in range(24):
+            day=date(2026,7,17)+timedelta(days=offset)
+            keys.append(build_slot_content(facts(day),slot)["scene_key"])
+        assert len(set(keys))==24
+
+def test_three_daily_posts_never_repeat_the_same_scene():
+    for offset in range(60):
         day=date(2026,7,17)+timedelta(days=offset)
-        signature=tuple(str(build_slot_content(facts(day),s)) for s in SLOTS)
-        assert signature not in seen
-        seen.add(signature)
+        keys=[build_slot_content(facts(day),slot)["scene_key"] for slot in ("morning","night","evening")]
+        assert len(set(keys))==3
+
+def test_scheduled_copy_has_daily_life_and_reasoning_depth():
+    for offset in range(60):
+        day=date(2026,7,17)+timedelta(days=offset)
+        for slot in ("morning","night","evening"):
+            report=validate_content_depth(build_slot_content(facts(day),slot))
+            assert report["passed"] and report["checked"]
+
+def test_morning_translates_the_supplied_sky_into_reasoning_and_action():
+    item=build_slot_content(facts(date(2026,8,15)),"morning")
+    assert "月と金星のセクスタイル" in item["hint"]
+    assert "月相の視点" not in item["hint"]
+    assert "最初の一手" in item["thinking"]
+    assert "\n" not in item["thinking"]
+    assert not any(label in item["thinking"] for label in ("考え方｜","動き方｜","問い｜"))
+    assert validate_content_depth(item)["passed"]
+
+def test_column_reads_as_one_article_with_three_spaced_paragraphs():
+    item=build_slot_content(facts(date(2026,8,10)),"night")
+    body=item["column"]
+    assert item["paragraphs"]==body.split("\n\n")
+    assert len(item["paragraphs"])==3
+    assert body.count("\n\n")==2
+    assert all("\n" not in paragraph for paragraph in item["paragraphs"])
+    assert len(body)>=180
+    assert not any(label in body for label in ("星の読み｜","日常の場面｜","考え方｜","判断基準｜","最初の一手｜","今日の一手｜","次回｜"))
+    assert "ending" not in item
+    assert validate_content_depth(item)["passed"]
+
+def test_all_twenty_four_columns_have_distinct_substance_and_no_item_labels():
+    columns=[]
+    for offset in range(24):
+        day=date(2026,7,17)+timedelta(days=offset)
+        item=build_slot_content(facts(day),"night")
+        columns.append(item["column"])
+        assert len(item["column"])>=180
+        assert item["column"].count("\n\n")==2
+        assert "｜" not in item["column"]
+        assert validate_content_depth(item)["passed"]
+    assert len(set(columns))==24
+
+def test_column_line_wrapping_never_exceeds_the_text_box():
+    image=Image.new("RGB",(1080,1920),"white")
+    draw=ImageDraw.Draw(image)
+    font=_gothic_font(41)
+    item=build_slot_content(facts(date(2026,8,10)),"night")
+    lines=_wrap_kinsoku(draw,item["column"],font,910)
+    assert all(draw.textlength(line,font=font)<=910 for line in lines)
+
+def test_evening_changes_from_maintenance_to_tarot_on_august_fifteenth():
+    last_maintenance=build_slot_content(facts(TAROT_START_DATE-timedelta(days=1)),"evening")
+    first_tarot=build_slot_content(facts(TAROT_START_DATE),"evening")
+    assert last_maintenance["title"]=="星よみメンテナンス"
+    assert first_tarot["title"]=="タロットノート"
+    assert first_tarot["card_name"]=="愚者"
+    assert first_tarot["content_kind"]=="tarot_knowledge"
+    assert not ({"question","next_card","series_day"} & first_tarot.keys())
+
+def test_tarot_topics_cover_general_knowledge_without_a_sequential_card_teaser():
+    topics=[]
+    card_numbers=[]
+    for offset in range(len(TAROT_TOPICS)):
+        item=build_slot_content(facts(TAROT_START_DATE+timedelta(days=offset)),"evening")
+        topics.append(item["topic_key"])
+        card_numbers.append(item["card_number"])
+        assert item["notes"]
+        assert item["origin"]
+        assert item["core"]
+        assert item["method"]
+        assert item["humor"]
+        assert "カードは黙っています" not in item["humor"]
+        assert not ({"question","next_card","series_day"} & item.keys())
+        assert validate_content_depth(item)["passed"]
+    assert len(set(topics))==len(TAROT_TOPICS)
+    assert card_numbers[:3] != [0,1,2]
 
 def test_seven_designs_rotate_without_consecutive_repeats():
     for slot in SLOTS:
@@ -68,6 +152,21 @@ def test_column_decoration_stays_tasteful_while_changing_daily():
     assert difference.getbbox() is not None
     assert 5.0<mean<15.0
 
+def test_night_edge_circle_never_enters_the_column_text_area():
+    start=date(2026,7,19)
+    day=next(start+timedelta(days=offset) for offset in range(28) if design_variant(start+timedelta(days=offset),"night")["motif_index"]==2)
+    base=Image.new("RGB",(1080,1920),(246,242,232))
+    theme=design_variant(day,"night")
+    tint=Image.blend(base,Image.new("RGB",base.size,theme["primary"]),0.055)
+    decorated=_decorate(base,day,"night")
+    motif_only=ImageChops.difference(tint,decorated)
+    assert motif_only.getbbox() is not None
+    assert motif_only.crop((85,900,995,1680)).getbbox() is None
+
+def test_column_title_uses_the_bundled_rounded_handwritten_font():
+    family,_style=_handwritten_gothic_font(48).getname()
+    assert "Klee" in family
+
 def test_mobile_readability_policy_never_shrinks_to_caption_size():
     assert MOBILE_BODY_MIN>=34
     assert MOBILE_SUPPORT_MIN>=28
@@ -89,22 +188,26 @@ def test_morning_palette_changes_are_obvious_on_a_phone():
     for left,right in zip(images,images[1:]):
         difference=ImageChops.difference(left,right)
         assert difference.getbbox() is not None
-        assert sum(ImageStat.Stat(difference).mean)/3>6.0
+        # The daily palette stays visibly different while respecting the masthead safe area.
+        assert sum(ImageStat.Stat(difference).mean)/3>5.0
         grayscale=difference.convert("L")
         histogram=grayscale.histogram()
         changed=sum(histogram[12:])/(1080*1920)
-        assert changed>0.10
+        assert changed>0.08
 
 def test_workflow_schedules_only_morning_column_and_evening():
     workflow=(Path(__file__).parents[1]/".github/workflows/daily-instagram-story.yml").read_text(encoding="utf-8")
     assert workflow.count('cron:')==3
-    for cron in ('41 20 * * *','11 0 * * *','11 9 * * *'):
+    for cron in ('41 20 * * *','41 1 * * *','41 7 * * *'):
         assert cron in workflow
-    for removed in ('58 20 * * *','8 21 * * *','18 21 * * *','30 0 * * *','40 0 * * *','50 0 * * *','30 9 * * *','40 9 * * *','50 9 * * *'):
+    for removed in ('58 20 * * *','8 21 * * *','18 21 * * *','30 0 * * *','40 0 * * *','50 0 * * *','30 9 * * *','40 9 * * *','50 9 * * *','11 0 * * *','11 9 * * *'):
         assert removed not in workflow
     assert 'PUBLISH_AT="06:00"' in workflow
+    assert 'PUBLISH_AT="11:00"' in workflow
+    assert 'PUBLISH_AT="17:00"' in workflow
     assert 'sleep "${WAIT_SECONDS}"' in workflow
     assert '--retry' not in workflow
+    assert '2026-08-15' in workflow
     assert '          - noon' not in workflow
     assert '          - night' not in workflow
 
