@@ -20,6 +20,7 @@ class InstagramPublisher:
         access_token: str | None = None,
         graph_base_url: str | None = None,
         api_version: str | None = None,
+        publish_settle_seconds: float | None = None,
         client: httpx.Client | None = None,
     ) -> None:
         self.user_id = user_id or os.getenv("INSTAGRAM_USER_ID", "").strip()
@@ -34,6 +35,11 @@ class InstagramPublisher:
             configured_graph_url = "https://graph.facebook.com"
         self.graph_base_url = configured_graph_url
         self.api_version = api_version or os.getenv("INSTAGRAM_API_VERSION", "v25.0")
+        self.publish_settle_seconds = (
+            publish_settle_seconds
+            if publish_settle_seconds is not None
+            else float(os.getenv("INSTAGRAM_PUBLISH_SETTLE_SECONDS", "5"))
+        )
         self.client = client or httpx.Client(timeout=60, follow_redirects=True)
 
         if not self.user_id or not self.access_token:
@@ -61,9 +67,18 @@ class InstagramPublisher:
         if response.is_success:
             return
         body = self._body(response)
-        message = body.get("error", {}).get("message") or body.get("message") or "不明なエラー"
+        error = body.get("error", {})
+        message = error.get("message") or body.get("message") or "不明なエラー"
+        details = []
+        if error.get("code") is not None:
+            details.append(f"code={error['code']}")
+        if error.get("error_subcode") is not None:
+            details.append(f"subcode={error['error_subcode']}")
+        if error.get("fbtrace_id"):
+            details.append(f"trace={error['fbtrace_id']}")
+        detail_suffix = f" ({', '.join(details)})" if details else ""
         raise InstagramAPIError(
-            f"Instagram APIエラー（HTTP {response.status_code}）: {message}"
+            f"Instagram APIエラー（HTTP {response.status_code}）: {message}{detail_suffix}"
         )
 
     def create_story_container(self, image_url: str) -> str:
@@ -146,6 +161,11 @@ class InstagramPublisher:
     def publish_story(self, image_url: str) -> str:
         container_id = self.create_story_container(image_url)
         self.wait_until_ready(container_id)
+        # Meta can report FINISHED a few seconds before media_publish can resolve
+        # the container globally. A short settling delay avoids that transient
+        # "Media ID is not available" window without issuing a duplicate POST.
+        if self.publish_settle_seconds > 0:
+            time.sleep(self.publish_settle_seconds)
         media_id = self.publish_container(container_id)
         self.verify_published(media_id)
         return media_id
