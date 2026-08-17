@@ -37,7 +37,13 @@ def index() -> str:
 
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
-    return {"status": "ok"}
+    tarot_assets = ROOT / "backend" / "assets" / "tarot"
+    tarot_art_files = len(list(tarot_assets.glob("major-??-rws1909-v1.jpeg")))
+    return {
+        "status": "ok",
+        "story_release": "classic-tarot-rws1909-v1",
+        "tarot_art_files": str(tarot_art_files),
+    }
 
 
 @app.post("/api/reading")
