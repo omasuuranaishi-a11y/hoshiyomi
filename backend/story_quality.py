@@ -32,6 +32,15 @@ THEMES = (
 MOTIFS = ("double-rule", "stardust", "celestial-arc", "open-corners")
 SLOT_OFFSETS={"morning":0,"noon":2,"evening":4,"night":6}
 
+def _required_tarot_art(card_number:int)->Path:
+    """Return the approved RWS1909 art, failing closed when it is unavailable."""
+    path=TAROT_DIR / f"major-{card_number:02d}-rws1909-v1.jpeg"
+    if not path.is_file() or path.stat().st_size < 100_000:
+        raise RuntimeError(
+            f"Tarot story blocked: approved card art is missing for major arcana {card_number:02d}"
+        )
+    return path
+
 def design_variant(day:date,slot:str)->dict[str,Any]:
     sequence=day.toordinal()+SLOT_OFFSETS[slot]
     palette_index=sequence%len(THEMES)
@@ -365,19 +374,16 @@ def _render_tarot(c:dict[str,Any],day:date)->Image.Image:
     _fit(d,f"大アルカナ {c['card_number']}｜{c['card_name']}",(80,382,520,470),max_size=40,min_size=32,font_fn=_gothic_bold_font,line_gap=.05)
 
     art_box=(80,480,520,1120)
-    art_candidates=sorted(TAROT_DIR.glob(f"major-{c['card_number']:02d}-*-v*.png"))
-    art_path=art_candidates[-1] if art_candidates else None
-    if art_path is not None:
-        with Image.open(art_path) as source:
-            art=source.convert("RGB")
-            target_w=art_box[2]-art_box[0]; target_h=art_box[3]-art_box[1]
-            scale=max(target_w/art.width,target_h/art.height)
-            resized=art.resize((round(art.width*scale),round(art.height*scale)),Image.Resampling.LANCZOS)
-            left=max(0,(resized.width-target_w)//2); top=max(0,(resized.height-target_h)//2)
-            im.paste(resized.crop((left,top,left+target_w,top+target_h)),art_box[:2])
-    else:
-        d.rounded_rectangle(art_box,radius=24,fill=dark_primary,outline=gold,width=5)
-        _fit(d,f"{c['card_number']:02d}\n{c['card_name']}",(120,620,480,880),max_size=72,min_size=52,fill=WHITE,align="center",line_gap=.30,font_fn=_gothic_bold_font)
+    art_path=_required_tarot_art(c["card_number"])
+    d.rounded_rectangle(art_box,radius=24,fill=dark_primary,outline=gold,width=5)
+    with Image.open(art_path) as source:
+        art=source.convert("RGB")
+        target_w=art_box[2]-art_box[0]-16; target_h=art_box[3]-art_box[1]-16
+        scale=min(target_w/art.width,target_h/art.height)
+        resized=art.resize((round(art.width*scale),round(art.height*scale)),Image.Resampling.LANCZOS)
+        left=art_box[0]+(art_box[2]-art_box[0]-resized.width)//2
+        top=art_box[1]+(art_box[3]-art_box[1]-resized.height)//2
+        im.paste(resized,(left,top))
     d.rounded_rectangle(art_box,radius=24,outline=gold,width=5)
 
     _fit(d,f"解説テーマ｜{c['category']}",(550,345,1000,390),max_size=26,min_size=23,fill=primary,font_fn=_gothic_bold_font,line_gap=.05)
@@ -471,7 +477,7 @@ def validate_story_asset(path:str|Path,content:dict[str,Any],day:date)->dict[str
         if image.format!="JPEG":raise RuntimeError(f"Story quality check failed: unexpected format {image.format}")
     size=asset.stat().st_size
     if size<150_000:raise RuntimeError("Story quality check failed: output is unexpectedly small")
-    return {
+    report = {
         "passed":True,
         "text_fit_checked":True,
         "layout":layout,
@@ -482,3 +488,14 @@ def validate_story_asset(path:str|Path,content:dict[str,Any],day:date)->dict[str
         },
         "asset_bytes":size,
     }
+    if content.get("content_kind")=="tarot_knowledge":
+        art_path=_required_tarot_art(content["card_number"])
+        with Image.open(art_path) as art:
+            art.verify()
+        report["tarot_card_art"]={
+            "required":True,
+            "detected":True,
+            "card_number":content["card_number"],
+            "asset":art_path.name,
+        }
+    return report
