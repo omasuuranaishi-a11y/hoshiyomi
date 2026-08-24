@@ -4,7 +4,7 @@ on:
   schedule:
     # Start away from the top of the hour, then wait until the exact JST target.
     # One event per slot prevents duplicate Instagram stories.
-    - cron: "41 20 * * *"  # starts 05:41 JST; publishes at 06:00
+    - cron: "41 19 * * *"  # starts 04:41 JST; publishes at 05:00
     - cron: "41 1 * * *"   # starts 10:41 JST; publishes at 11:00
     - cron: "41 7 * * *"   # starts 16:41 JST; publishes at 17:00
   workflow_dispatch:
@@ -42,7 +42,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           case "${SCHEDULE}" in
-            "41 20 * * *") SLOT="morning"; PUBLISH_AT="06:00" ;;
+            "41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
             "41 1 * * *") SLOT="night"; PUBLISH_AT="11:00" ;;
             "41 7 * * *") SLOT="evening"; PUBLISH_AT="17:00" ;;
             *) SLOT="${MANUAL_SLOT:-morning}" ;;
