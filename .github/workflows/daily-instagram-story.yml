@@ -92,7 +92,7 @@ jobs:
 
       - name: Restore persistent published marker
         id: published-marker
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .story-published/${{ steps.resolve.outputs.target_date }}-${{ steps.resolve.outputs.slot }}.done
           key: instagram-story-${{ steps.resolve.outputs.target_date }}-${{ steps.resolve.outputs.slot }}
@@ -127,7 +127,7 @@ jobs:
 
       - name: Save persistent published marker
         if: steps.publish-story.outcome == 'success' && steps.published-marker.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .story-published/${{ steps.resolve.outputs.target_date }}-${{ steps.resolve.outputs.slot }}.done
           key: instagram-story-${{ steps.resolve.outputs.target_date }}-${{ steps.resolve.outputs.slot }}
