@@ -2,12 +2,18 @@ name: Three Daily Instagram Stories
 
 on:
   schedule:
-    # Start five minutes early, then wait briefly until the exact JST target.
-    # GitHub can also deliver cron events many hours late, so the job never
-    # waits longer than ten minutes (see the resolver below).
-    - cron: "55 19 * * *"  # starts 04:55 JST; publishes at 05:00
-    - cron: "55 1 * * *"   # starts 10:55 JST; publishes at 11:00
-    - cron: "55 7 * * *"   # starts 16:55 JST; publishes at 17:00
+    # Three idempotent chances per slot: primary, +10m backup, +25m watchdog.
+    # The API skips an already-published date/slot, so backup events cannot
+    # create duplicate Instagram stories.
+    - cron: "55 19 * * *"  # 04:55 JST -> morning primary at 05:00
+    - cron: "10 20 * * *"  # 05:10 JST -> morning backup
+    - cron: "25 20 * * *"  # 05:25 JST -> morning watchdog
+    - cron: "55 1 * * *"   # 10:55 JST -> column primary at 11:00
+    - cron: "10 2 * * *"   # 11:10 JST -> column backup
+    - cron: "25 2 * * *"   # 11:25 JST -> column watchdog
+    - cron: "55 7 * * *"   # 16:55 JST -> tarot primary at 17:00
+    - cron: "10 8 * * *"   # 17:10 JST -> tarot backup
+    - cron: "25 8 * * *"   # 17:25 JST -> tarot watchdog
   workflow_dispatch:
     inputs:
       slot:
@@ -43,9 +49,9 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           case "${SCHEDULE}" in
-            "55 19 * * *"|"41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
-            "55 1 * * *"|"41 1 * * *") SLOT="night"; PUBLISH_AT="11:00" ;;
-            "55 7 * * *"|"41 7 * * *") SLOT="evening"; PUBLISH_AT="17:00" ;;
+            "55 19 * * *"|"10 20 * * *"|"25 20 * * *"|"41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
+            "55 1 * * *"|"10 2 * * *"|"25 2 * * *"|"41 1 * * *") SLOT="night"; PUBLISH_AT="11:00" ;;
+            "55 7 * * *"|"10 8 * * *"|"25 8 * * *"|"41 7 * * *") SLOT="evening"; PUBLISH_AT="17:00" ;;
             *) SLOT="${MANUAL_SLOT:-morning}" ;;
           esac
           if [ "${SLOT}" = "column" ]; then SLOT="night"; fi
