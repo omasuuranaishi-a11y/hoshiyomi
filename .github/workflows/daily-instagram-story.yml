@@ -3,8 +3,8 @@ name: Three Daily Instagram Stories
 on:
   schedule:
     # Three idempotent chances per slot: primary, +10m backup, +25m watchdog.
-    # The API skips an already-published date/slot, so backup events cannot
-    # create duplicate Instagram stories.
+    # A persistent GitHub cache marker plus the API record prevents duplicate
+    # Instagram stories even when Render restarts and loses its local record.
     - cron: "55 19 * * *"  # 04:55 JST -> morning primary at 05:00
     - cron: "10 20 * * *"  # 05:10 JST -> morning backup
     - cron: "25 20 * * *"  # 05:25 JST -> morning watchdog
@@ -29,6 +29,16 @@ on:
         description: Optional YYYY-MM-DD in JST
         required: false
         type: string
+      force_repost:
+        description: Repost even when the date/slot is already recorded
+        required: false
+        default: false
+        type: boolean
+      mark_published_only:
+        description: Record the date/slot as published without calling Instagram
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: daily-instagram-story
@@ -39,13 +49,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - name: Generate and publish one story
+      - name: Resolve slot and target date
+        id: resolve
         env:
-          AUTOMATION_URL: ${{ secrets.AUTOMATION_URL }}
-          AUTOMATION_SECRET: ${{ secrets.AUTOMATION_SECRET }}
           SCHEDULE: ${{ github.event.schedule }}
           MANUAL_SLOT: ${{ inputs.slot }}
-          TARGET_DATE: ${{ inputs.target_date }}
+          MANUAL_TARGET_DATE: ${{ inputs.target_date }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           case "${SCHEDULE}" in
@@ -56,19 +65,17 @@ jobs:
           esac
           if [ "${SLOT}" = "column" ]; then SLOT="night"; fi
           TODAY_JST="$(TZ=Asia/Tokyo date +%F)"
+          TARGET_DATE="${MANUAL_TARGET_DATE:-${TODAY_JST}}"
           if [ "${EVENT_NAME}" = "schedule" ] && [ "${TODAY_JST}" \< "2026-08-15" ]; then
             echo "Automatic Instagram stories start on 2026-08-15 JST; skipping ${TODAY_JST}."
             exit 0
           fi
           if [ "${EVENT_NAME}" = "schedule" ]; then
-            TARGET_EPOCH="$(TZ=Asia/Tokyo date -d "$(TZ=Asia/Tokyo date +%F) ${PUBLISH_AT}:00" +%s)"
+            TARGET_EPOCH="$(TZ=Asia/Tokyo date -d "${TODAY_JST} ${PUBLISH_AT}:00" +%s)"
             NOW_EPOCH="$(date +%s)"
             WAIT_SECONDS="$((TARGET_EPOCH - NOW_EPOCH))"
             MAX_WAIT_SECONDS=600
             if [ "${WAIT_SECONDS}" -gt "${MAX_WAIT_SECONDS}" ]; then
-              # Cron events can arrive after midnight many hours late. Treat
-              # these as the previous day's slot instead of sleeping until
-              # today's slot and hitting the job timeout.
               TARGET_DATE="$(TZ=Asia/Tokyo date -d yesterday +%F)"
               echo "Delayed ${SLOT} event; publishing ${TARGET_DATE} immediately."
             elif [ "${WAIT_SECONDS}" -gt 0 ]; then
@@ -80,24 +87,47 @@ jobs:
               echo "The scheduler started late; publishing immediately."
             fi
           fi
-          # The July 17 morning story was recovered manually after the first-run failure.
-          # Skip any delayed copy of the original 06:00 event to prevent duplication.
-          if [ "${EVENT_NAME}" = "schedule" ] && [ "${SLOT}" = "morning" ] && [ "$(TZ=Asia/Tokyo date +%F)" = "2026-07-17" ]; then
-            echo "July 17 morning story already recovered; skipping delayed event."
-            exit 0
+          echo "slot=${SLOT}" >> "${GITHUB_OUTPUT}"
+          echo "target_date=${TARGET_DATE}" >> "${GITHUB_OUTPUT}"
+
+      - name: Restore persistent published marker
+        id: published-marker
+        uses: actions/cache/restore@v4
+        with:
+          path: .story-published/${{ steps.resolve.outputs.target_date }}-${{ steps.resolve.outputs.slot }}.done
+          key: instagram-story-${{ steps.resolve.outputs.target_date }}-${{ steps.resolve.outputs.slot }}
+
+      - name: Generate and publish one story
+        id: publish-story
+        if: inputs.mark_published_only == true || github.event_name == 'workflow_dispatch' || steps.published-marker.outputs.cache-hit != 'true'
+        env:
+          AUTOMATION_URL: ${{ secrets.AUTOMATION_URL }}
+          AUTOMATION_SECRET: ${{ secrets.AUTOMATION_SECRET }}
+          SLOT: ${{ steps.resolve.outputs.slot }}
+          TARGET_DATE: ${{ steps.resolve.outputs.target_date }}
+          FORCE_REPOST: ${{ inputs.force_repost }}
+          MARK_PUBLISHED_ONLY: ${{ inputs.mark_published_only }}
+        run: |
+          if [ "${MARK_PUBLISHED_ONLY}" != "true" ]; then
+            QUERY="slot=${SLOT}&target_date=${TARGET_DATE}"
+            if [ "${FORCE_REPOST}" = "true" ]; then
+              QUERY="${QUERY}&force=true"
+            fi
+            SEPARATOR="?"
+            case "${AUTOMATION_URL}" in *\?*) SEPARATOR="&" ;; esac
+            curl --fail-with-body --show-error --silent --max-time 180 \
+              --request POST \
+              --header "Authorization: Bearer ${AUTOMATION_SECRET}" \
+              "${AUTOMATION_URL}${SEPARATOR}${QUERY}"
+          else
+            echo "Recording ${TARGET_DATE}/${SLOT} without publishing."
           fi
-          QUERY="slot=${SLOT}"
-          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
-            QUERY="${QUERY}&force=true"
-          fi
-          if [ -n "${TARGET_DATE}" ]; then
-            QUERY="${QUERY}&target_date=${TARGET_DATE}"
-          fi
-          SEPARATOR="?"
-          case "${AUTOMATION_URL}" in *\?*) SEPARATOR="&" ;; esac
-          # Do not retry this POST: an ambiguous network response must never
-          # create a second Instagram story.
-          curl --fail-with-body --show-error --silent --max-time 180 \
-            --request POST \
-            --header "Authorization: Bearer ${AUTOMATION_SECRET}" \
-            "${AUTOMATION_URL}${SEPARATOR}${QUERY}"
+          mkdir -p .story-published
+          printf '%s\n' "${TARGET_DATE}/${SLOT}" > ".story-published/${TARGET_DATE}-${SLOT}.done"
+
+      - name: Save persistent published marker
+        if: steps.publish-story.outcome == 'success' && steps.published-marker.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .story-published/${{ steps.resolve.outputs.target_date }}-${{ steps.resolve.outputs.slot }}.done
+          key: instagram-story-${{ steps.resolve.outputs.target_date }}-${{ steps.resolve.outputs.slot }}
