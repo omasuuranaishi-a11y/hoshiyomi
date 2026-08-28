@@ -2,11 +2,12 @@ name: Three Daily Instagram Stories
 
 on:
   schedule:
-    # Start away from the top of the hour, then wait until the exact JST target.
-    # One event per slot prevents duplicate Instagram stories.
-    - cron: "41 19 * * *"  # starts 04:41 JST; publishes at 05:00
-    - cron: "41 1 * * *"   # starts 10:41 JST; publishes at 11:00
-    - cron: "41 7 * * *"   # starts 16:41 JST; publishes at 17:00
+    # Start five minutes early, then wait briefly until the exact JST target.
+    # GitHub can also deliver cron events many hours late, so the job never
+    # waits longer than ten minutes (see the resolver below).
+    - cron: "55 19 * * *"  # starts 04:55 JST; publishes at 05:00
+    - cron: "55 1 * * *"   # starts 10:55 JST; publishes at 11:00
+    - cron: "55 7 * * *"   # starts 16:55 JST; publishes at 17:00
   workflow_dispatch:
     inputs:
       slot:
@@ -30,7 +31,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Generate and publish one story
         env:
@@ -42,9 +43,9 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           case "${SCHEDULE}" in
-            "41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
-            "41 1 * * *") SLOT="night"; PUBLISH_AT="11:00" ;;
-            "41 7 * * *") SLOT="evening"; PUBLISH_AT="17:00" ;;
+            "55 19 * * *"|"41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
+            "55 1 * * *"|"41 1 * * *") SLOT="night"; PUBLISH_AT="11:00" ;;
+            "55 7 * * *"|"41 7 * * *") SLOT="evening"; PUBLISH_AT="17:00" ;;
             *) SLOT="${MANUAL_SLOT:-morning}" ;;
           esac
           if [ "${SLOT}" = "column" ]; then SLOT="night"; fi
@@ -57,10 +58,19 @@ jobs:
             TARGET_EPOCH="$(TZ=Asia/Tokyo date -d "$(TZ=Asia/Tokyo date +%F) ${PUBLISH_AT}:00" +%s)"
             NOW_EPOCH="$(date +%s)"
             WAIT_SECONDS="$((TARGET_EPOCH - NOW_EPOCH))"
-            if [ "${WAIT_SECONDS}" -gt 0 ]; then
+            MAX_WAIT_SECONDS=600
+            if [ "${WAIT_SECONDS}" -gt "${MAX_WAIT_SECONDS}" ]; then
+              # Cron events can arrive after midnight many hours late. Treat
+              # these as the previous day's slot instead of sleeping until
+              # today's slot and hitting the job timeout.
+              TARGET_DATE="$(TZ=Asia/Tokyo date -d yesterday +%F)"
+              echo "Delayed ${SLOT} event; publishing ${TARGET_DATE} immediately."
+            elif [ "${WAIT_SECONDS}" -gt 0 ]; then
+              TARGET_DATE="${TODAY_JST}"
               echo "Waiting ${WAIT_SECONDS}s for ${PUBLISH_AT} JST."
               sleep "${WAIT_SECONDS}"
             else
+              TARGET_DATE="${TODAY_JST}"
               echo "The scheduler started late; publishing immediately."
             fi
           fi
