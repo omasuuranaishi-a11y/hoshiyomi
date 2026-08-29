@@ -1,3 +1,9 @@
+envVarGroups:
+  - name: instagram-cron-auth
+    envVars:
+      - key: RENDER_CRON_SECRET
+        generateValue: true
+
 services:
   - type: web
     name: omasu-instagram-story
@@ -6,6 +12,7 @@ services:
     buildCommand: pip install -r requirements-instagram.txt
     startCommand: uvicorn backend.automation_main_free:app --host 0.0.0.0 --port $PORT
     envVars:
+      - fromGroup: instagram-cron-auth
       - key: OPENAI_MODEL
         value: unused-free-mode
       - key: INSTAGRAM_USER_ID
@@ -24,3 +31,15 @@ services:
         value: Asia/Tokyo
       - key: ALLOW_FALLBACK_COPY
         value: "true"
+
+  - type: cron
+    name: omasu-instagram-story-cron
+    runtime: python
+    plan: starter
+    schedule: "56 1,7,19 * * *"
+    buildCommand: pip install -r requirements-instagram.txt
+    startCommand: python -m backend.render_cron
+    envVars:
+      - fromGroup: instagram-cron-auth
+      - key: AUTOMATION_URL
+        value: https://omasu-instagram-story.onrender.com/api/automation/daily-story

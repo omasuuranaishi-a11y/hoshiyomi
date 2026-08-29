@@ -41,9 +41,18 @@ def daily_story_automation(
     force: bool = False,
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
 ) -> JSONResponse:
-    expected = os.getenv("AUTOMATION_SECRET", "")
+    expected_values = [
+        value
+        for value in (
+            os.getenv("AUTOMATION_SECRET", ""),
+            os.getenv("RENDER_CRON_SECRET", ""),
+        )
+        if value
+    ]
     received = (authorization or "").removeprefix("Bearer ").strip()
-    if not expected or not received or not secrets.compare_digest(expected, received):
+    if not received or not any(
+        secrets.compare_digest(expected, received) for expected in expected_values
+    ):
         raise HTTPException(status_code=401, detail="unauthorized")
     try:
         result = run_story_slot(
