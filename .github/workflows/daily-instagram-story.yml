@@ -2,19 +2,20 @@ name: Three Daily Instagram Stories
 
 on:
   schedule:
-    # Render Cron is the exact-time primary. GitHub starts after each target as
-    # an independent recovery path, avoiding a simultaneous publish race.
+    # Start the three morning chances well before 05:00 JST. GitHub scheduled
+    # events can be delayed or dropped, so each chance has enough lead time to
+    # wait for 05:00 instead of depending on a just-in-time scheduler wake-up.
     # A persistent GitHub cache marker plus the API record prevents duplicate
     # Instagram stories even when Render restarts and loses its local record.
-    - cron: "7 20 * * *"   # 05:07 JST -> morning recovery 1
-    - cron: "17 20 * * *"  # 05:17 JST -> morning recovery 2
-    - cron: "27 20 * * *"  # 05:27 JST -> morning recovery 3
-    - cron: "7 2 * * *"    # 11:07 JST -> column recovery 1
-    - cron: "17 2 * * *"   # 11:17 JST -> column recovery 2
-    - cron: "27 2 * * *"   # 11:27 JST -> column recovery 3
-    - cron: "7 8 * * *"    # 17:07 JST -> tarot recovery 1
-    - cron: "17 8 * * *"   # 17:17 JST -> tarot recovery 2
-    - cron: "27 8 * * *"   # 17:27 JST -> tarot recovery 3
+    - cron: "43 17 * * *"  # 02:43 JST -> morning primary waits for 05:00
+    - cron: "31 18 * * *"  # 03:31 JST -> second morning chance
+    - cron: "19 19 * * *"  # 04:19 JST -> third morning chance
+    - cron: "55 1 * * *"   # 10:55 JST -> column primary at 11:00
+    - cron: "10 2 * * *"   # 11:10 JST -> column backup
+    - cron: "25 2 * * *"   # 11:25 JST -> column watchdog
+    - cron: "55 7 * * *"   # 16:55 JST -> tarot primary at 17:00
+    - cron: "10 8 * * *"   # 17:10 JST -> tarot backup
+    - cron: "25 8 * * *"   # 17:25 JST -> tarot watchdog
   workflow_dispatch:
     inputs:
       slot:
@@ -59,9 +60,9 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           case "${SCHEDULE}" in
-            "7 20 * * *"|"17 20 * * *"|"27 20 * * *"|"43 17 * * *"|"31 18 * * *"|"19 19 * * *"|"55 19 * * *"|"10 20 * * *"|"25 20 * * *"|"41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
-            "7 2 * * *"|"17 2 * * *"|"27 2 * * *"|"55 1 * * *"|"10 2 * * *"|"25 2 * * *"|"41 1 * * *") SLOT="night"; PUBLISH_AT="11:00" ;;
-            "7 8 * * *"|"17 8 * * *"|"27 8 * * *"|"55 7 * * *"|"10 8 * * *"|"25 8 * * *"|"41 7 * * *") SLOT="evening"; PUBLISH_AT="17:00" ;;
+            "43 17 * * *"|"31 18 * * *"|"19 19 * * *"|"55 19 * * *"|"10 20 * * *"|"25 20 * * *"|"41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
+            "55 1 * * *"|"10 2 * * *"|"25 2 * * *"|"41 1 * * *") SLOT="night"; PUBLISH_AT="11:00" ;;
+            "55 7 * * *"|"10 8 * * *"|"25 8 * * *"|"41 7 * * *") SLOT="evening"; PUBLISH_AT="17:00" ;;
             *) SLOT="${MANUAL_SLOT:-morning}" ;;
           esac
           if [ "${SLOT}" = "column" ]; then SLOT="night"; fi
