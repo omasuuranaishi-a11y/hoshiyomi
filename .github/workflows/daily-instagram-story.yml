@@ -2,12 +2,14 @@ name: Three Daily Instagram Stories
 
 on:
   schedule:
-    # Three idempotent chances per slot: primary, +10m backup, +25m watchdog.
+    # Start the three morning chances well before 05:00 JST. GitHub scheduled
+    # events can be delayed or dropped, so each chance has enough lead time to
+    # wait for 05:00 instead of depending on a just-in-time scheduler wake-up.
     # A persistent GitHub cache marker plus the API record prevents duplicate
     # Instagram stories even when Render restarts and loses its local record.
-    - cron: "55 19 * * *"  # 04:55 JST -> morning primary at 05:00
-    - cron: "10 20 * * *"  # 05:10 JST -> morning backup
-    - cron: "25 20 * * *"  # 05:25 JST -> morning watchdog
+    - cron: "43 17 * * *"  # 02:43 JST -> morning primary waits for 05:00
+    - cron: "31 18 * * *"  # 03:31 JST -> second morning chance
+    - cron: "19 19 * * *"  # 04:19 JST -> third morning chance
     - cron: "55 1 * * *"   # 10:55 JST -> column primary at 11:00
     - cron: "10 2 * * *"   # 11:10 JST -> column backup
     - cron: "25 2 * * *"   # 11:25 JST -> column watchdog
@@ -47,7 +49,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 180
     steps:
       - name: Resolve slot and target date
         id: resolve
@@ -58,7 +60,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           case "${SCHEDULE}" in
-            "55 19 * * *"|"10 20 * * *"|"25 20 * * *"|"41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
+            "43 17 * * *"|"31 18 * * *"|"19 19 * * *"|"55 19 * * *"|"10 20 * * *"|"25 20 * * *"|"41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
             "55 1 * * *"|"10 2 * * *"|"25 2 * * *"|"41 1 * * *") SLOT="night"; PUBLISH_AT="11:00" ;;
             "55 7 * * *"|"10 8 * * *"|"25 8 * * *"|"41 7 * * *") SLOT="evening"; PUBLISH_AT="17:00" ;;
             *) SLOT="${MANUAL_SLOT:-morning}" ;;
@@ -70,18 +72,22 @@ jobs:
             echo "Automatic Instagram stories start on 2026-08-15 JST; skipping ${TODAY_JST}."
             exit 0
           fi
+          PUBLISH_EPOCH=0
           if [ "${EVENT_NAME}" = "schedule" ]; then
             TARGET_EPOCH="$(TZ=Asia/Tokyo date -d "${TODAY_JST} ${PUBLISH_AT}:00" +%s)"
             NOW_EPOCH="$(date +%s)"
             WAIT_SECONDS="$((TARGET_EPOCH - NOW_EPOCH))"
-            MAX_WAIT_SECONDS=600
-            if [ "${WAIT_SECONDS}" -gt "${MAX_WAIT_SECONDS}" ]; then
+            # The earliest morning trigger is 137 minutes before 05:00. A
+            # wait longer than three hours means this is a heavily delayed
+            # event from the previous JST date, so recover yesterday instead.
+            MAX_EARLY_SECONDS=10800
+            if [ "${WAIT_SECONDS}" -gt "${MAX_EARLY_SECONDS}" ]; then
               TARGET_DATE="$(TZ=Asia/Tokyo date -d yesterday +%F)"
               echo "Delayed ${SLOT} event; publishing ${TARGET_DATE} immediately."
             elif [ "${WAIT_SECONDS}" -gt 0 ]; then
               TARGET_DATE="${TODAY_JST}"
-              echo "Waiting ${WAIT_SECONDS}s for ${PUBLISH_AT} JST."
-              sleep "${WAIT_SECONDS}"
+              PUBLISH_EPOCH="${TARGET_EPOCH}"
+              echo "Runner is ready ${WAIT_SECONDS}s before ${PUBLISH_AT} JST."
             else
               TARGET_DATE="${TODAY_JST}"
               echo "The scheduler started late; publishing immediately."
@@ -89,6 +95,7 @@ jobs:
           fi
           echo "slot=${SLOT}" >> "${GITHUB_OUTPUT}"
           echo "target_date=${TARGET_DATE}" >> "${GITHUB_OUTPUT}"
+          echo "publish_epoch=${PUBLISH_EPOCH}" >> "${GITHUB_OUTPUT}"
 
       - name: Restore persistent published marker
         id: published-marker
@@ -107,8 +114,33 @@ jobs:
           TARGET_DATE: ${{ steps.resolve.outputs.target_date }}
           FORCE_REPOST: ${{ inputs.force_repost }}
           MARK_PUBLISHED_ONLY: ${{ inputs.mark_published_only }}
+          EVENT_NAME: ${{ github.event_name }}
+          PUBLISH_EPOCH: ${{ steps.resolve.outputs.publish_epoch }}
         run: |
           if [ "${MARK_PUBLISHED_ONLY}" != "true" ]; then
+            if [ "${EVENT_NAME}" = "schedule" ] && [ "${PUBLISH_EPOCH:-0}" -gt 0 ]; then
+              # Wake the free Render service four minutes early, then publish
+              # at the target epoch. The health check is read-only and safe to
+              # retry; the Instagram POST below is intentionally never retried.
+              WARMUP_EPOCH="$((PUBLISH_EPOCH - 240))"
+              NOW_EPOCH="$(date +%s)"
+              WARMUP_WAIT="$((WARMUP_EPOCH - NOW_EPOCH))"
+              if [ "${WARMUP_WAIT}" -gt 0 ]; then
+                echo "Waiting ${WARMUP_WAIT}s before warming Render."
+                sleep "${WARMUP_WAIT}"
+              fi
+              HEALTHCHECK_URL="${AUTOMATION_URL%%/api/*}/healthz"
+              echo "Warming Render with ${HEALTHCHECK_URL}."
+              curl --fail --show-error --silent --max-time 120 \
+                --retry 3 --retry-delay 5 \
+                "${HEALTHCHECK_URL}" > /dev/null || echo "Warm-up failed; publish will still be attempted."
+              NOW_EPOCH="$(date +%s)"
+              FINAL_WAIT="$((PUBLISH_EPOCH - NOW_EPOCH))"
+              if [ "${FINAL_WAIT}" -gt 0 ]; then
+                echo "Waiting ${FINAL_WAIT}s for the exact publish time."
+                sleep "${FINAL_WAIT}"
+              fi
+            fi
             QUERY="slot=${SLOT}&target_date=${TARGET_DATE}"
             if [ "${FORCE_REPOST}" = "true" ]; then
               QUERY="${QUERY}&force=true"
