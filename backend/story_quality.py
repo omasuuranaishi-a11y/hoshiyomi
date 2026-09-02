@@ -88,11 +88,9 @@ def _decorate(im:Image.Image,day:date,slot:str)->Image.Image:
             for x,y in ((28,230),(1052,260),(28,1390),(1052,1580)):
                 d.ellipse((x-6,y-6,x+6,y+6),fill=(*gold,220));d.line((x-18,y,x+18,y),fill=(*gold,180),width=2);d.line((x,y-18,x,y+18),fill=(*gold,180),width=2)
         elif v==2:
-            # Keep this motif entirely in the outer margin. It is drawn after
-            # the copy, so even a translucent stroke must never enter x=85+.
-            d.arc((-330,1180,45,1680),270,70,fill=(*secondary,75),width=4)
-            for i in range(6):
-                y=1375+i*42;d.ellipse((2+i*3,y,24+i*3,y+16),fill=(*secondary,55))
+            # The former circle-and-dots motif was removed after visual review.
+            # Leave the paper edge quiet so the copy remains the only focal point.
+            pass
         else:
             d.polygon(((0,0),(125,0),(78,105),(0,145)),fill=(*primary,75));d.polygon(((1080,1920),(930,1920),(985,1795),(1080,1740)),fill=(*secondary,70))
         return im
@@ -111,10 +109,8 @@ def _decorate(im:Image.Image,day:date,slot:str)->Image.Image:
             x=55+offset*155; y=1740+(offset%2)*18
             d.ellipse((x-4,y-4,x+4,y+4),fill=(*primary,210))
     elif v==2:
-        d.arc((-260,1160,120,1690),270,70,fill=(*secondary,225),width=10)
-        for i in range(6):
-            y=1365+i*44;d.ellipse((8+i*6,y,52+i*6,y+23),fill=(*secondary,165))
-        d.arc((918,165,1115,405),80,270,fill=(*gold,190),width=7)
+        # The circle motif is intentionally absent; the card art is the focal point.
+        pass
     else:
         d.polygon(((0,0),(185,0),(112,142),(0,205)),fill=(*primary,115));d.polygon(((1080,1920),(860,1920),(970,1740),(1080,1675)),fill=(*secondary,110))
         d.line((50,178,50,410),fill=(*gold,210),width=5);d.line((1030,1510,1030,1740),fill=(*gold,210),width=5)
@@ -414,8 +410,97 @@ def _render_tarot(c:dict[str,Any],day:date)->Image.Image:
     _fit(d,"@omasu_horoscope",(300,1820,780,1870),max_size=25,min_size=22,fill=MUTED,align="center",font_fn=_gothic_font)
     return im
 
+def _paste_tarot_card(im:Image.Image,draw:ImageDraw.ImageDraw,card_number:int,box:tuple[int,int,int,int],gold:tuple[int,int,int],dark:tuple[int,int,int])->None:
+    draw.rounded_rectangle(box,radius=22,fill=dark,outline=gold,width=5)
+    with Image.open(_required_tarot_art(card_number)) as source:
+        art=source.convert("RGB")
+        target_w=box[2]-box[0]-16; target_h=box[3]-box[1]-16
+        scale=min(target_w/art.width,target_h/art.height)
+        resized=art.resize((round(art.width*scale),round(art.height*scale)),Image.Resampling.LANCZOS)
+        left=box[0]+(box[2]-box[0]-resized.width)//2
+        top=box[1]+(box[3]-box[1]-resized.height)//2
+        im.paste(resized,(left,top))
+    draw.rounded_rectangle(box,radius=22,outline=gold,width=5)
+
+def _render_tarot_insight(c:dict[str,Any],day:date)->Image.Image:
+    validate_layout_regions("evening")
+    theme=design_variant(day,"evening"); primary=theme["primary"]; secondary=theme["secondary"]; gold=theme["gold"]
+    dark=_mix_color(NAVY,primary,0.26)
+    soft_primary=_mix_color(PAPER,primary,0.10)
+    soft_secondary=_mix_color(PAPER,secondary,0.10)
+    im=Image.new("RGB",(WIDTH,HEIGHT),PAPER);d=ImageDraw.Draw(im)
+
+    d.rectangle((0,0,58,HEIGHT),fill=dark)
+    d.polygon(((760,0),(1080,0),(1080,250),(940,185)),fill=dark)
+    d.polygon(((0,1770),(230,1660),(360,1920),(0,1920)),fill=_mix_color(PAPER,secondary,0.38))
+    d.rounded_rectangle((24,24,1056,1896),radius=44,outline=gold,width=4)
+    for x,y in ((90,115),(1010,310),(55,1160),(1015,1410)):
+        d.ellipse((x-7,y-7,x+7,y+7),fill=gold);d.line((x-21,y,x+21,y),fill=gold,width=2);d.line((x,y-21,x,y+21),fill=gold,width=2)
+
+    _fit(d,"OMASU TAROT NOTE",(85,55,540,108),max_size=25,min_size=23,fill=MUTED,font_fn=_gothic_font)
+    d.rounded_rectangle((720,42,1010,112),radius=14,fill=dark)
+    _fit(d,_date_text(day),(735,55,995,105),max_size=28,min_size=25,fill=WHITE,align="center",font_fn=_gothic_font)
+    _fit(d,c["title"],(80,150,1000,245),max_size=66,min_size=58,align="center",font_fn=_gothic_bold_font)
+    d.rounded_rectangle((360,270,720,330),radius=28,fill=primary)
+    _fit(d,c["kicker"],(385,279,695,322),max_size=27,min_size=24,fill=WHITE,align="center",font_fn=_gothic_bold_font,line_gap=.05)
+    _fit(d,c["headline"],(90,355,990,520),max_size=58,min_size=46,align="center",font_fn=_gothic_bold_font,line_gap=.12)
+    _fit(d,c["lead"],(105,535,975,620),max_size=31,min_size=27,fill=MUTED,align="center",font_fn=_gothic_font,line_gap=.12)
+
+    card_count=len(c["card_numbers"])
+    if card_count==3:
+        card_boxes=((85,645,345,1040),(410,645,670,1040),(735,645,995,1040))
+        label_boxes=((75,1050,355,1125),(400,1050,680,1125),(725,1050,1005,1125))
+        for number,card_box in zip(c["card_numbers"],card_boxes):
+            _paste_tarot_card(im,d,number,card_box,gold,dark)
+        for label,label_box in zip(c["card_labels"],label_boxes):
+            _fit(d,label,label_box,max_size=25,min_size=21,fill=primary,align="center",font_fn=_gothic_bold_font,line_gap=.04)
+        for point,box,fill in zip(c["points"],((80,1145,520,1385),(560,1145,1000,1385)),(soft_primary,soft_secondary)):
+            d.rounded_rectangle(box,radius=20,fill=fill,outline=gold,width=2)
+            _fit(d,point["label"],(box[0]+24,box[1]+18,box[2]-24,box[1]+60),max_size=27,min_size=23,fill=primary,font_fn=_gothic_bold_font,line_gap=.05)
+            _fit(d,point["body"],(box[0]+24,box[1]+72,box[2]-24,box[3]-20),max_size=27,min_size=22,font_fn=_gothic_font,line_gap=.12)
+        reason_box=(80,1410,1000,1585)
+        takeaway_box=(105,1600,975,1682)
+    elif card_count==2:
+        card_boxes=((100,645,480,1125),(600,645,980,1125))
+        label_boxes=((90,1140,490,1210),(590,1140,990,1210))
+        point_boxes=((90,1230,490,1435),(590,1230,990,1435))
+        point_fills=(soft_primary,soft_secondary)
+        for number,card_box in zip(c["card_numbers"],card_boxes):
+            _paste_tarot_card(im,d,number,card_box,gold,dark)
+        for label,label_box in zip(c["card_labels"],label_boxes):
+            _fit(d,label,label_box,max_size=29,min_size=25,fill=primary,align="center",font_fn=_gothic_bold_font,line_gap=.05)
+        for point,box,fill in zip(c["points"],point_boxes,point_fills):
+            d.rounded_rectangle(box,radius=20,fill=fill,outline=gold,width=2)
+            _fit(d,point["label"],(box[0]+24,box[1]+18,box[2]-24,box[1]+60),max_size=27,min_size=24,fill=primary,font_fn=_gothic_bold_font,line_gap=.05)
+            _fit(d,point["body"],(box[0]+24,box[1]+72,box[2]-24,box[3]-20),max_size=28,min_size=23,font_fn=_gothic_font,line_gap=.12)
+        reason_box=(80,1460,1000,1585)
+        takeaway_box=(105,1600,975,1682)
+    else:
+        card_box=(95,650,505,1205)
+        _paste_tarot_card(im,d,c["card_numbers"][0],card_box,gold,dark)
+        _fit(d,c["card_labels"][0],(80,1220,520,1280),max_size=28,min_size=24,fill=primary,align="center",font_fn=_gothic_bold_font,line_gap=.05)
+        for point,top,fill in zip(c["points"],(660,905),(soft_primary,soft_secondary)):
+            box=(550,top,1000,top+220)
+            d.rounded_rectangle(box,radius=20,fill=fill,outline=gold,width=2)
+            _fit(d,point["label"],(575,top+18,975,top+62),max_size=28,min_size=25,fill=primary,font_fn=_gothic_bold_font,line_gap=.05)
+            _fit(d,point["body"],(575,top+75,975,top+200),max_size=29,min_size=24,font_fn=_gothic_font,line_gap=.12)
+        reason_box=(80,1300,1000,1515)
+        takeaway_box=(105,1545,975,1682)
+
+    d.rounded_rectangle(reason_box,radius=22,fill=(253,249,240),outline=secondary,width=3)
+    _fit(d,c["reasoning"],(reason_box[0]+30,reason_box[1]+20,reason_box[2]-30,reason_box[3]-18),max_size=30,min_size=24,font_fn=_gothic_font,line_gap=.15)
+    d.rounded_rectangle(takeaway_box,radius=28,fill=dark)
+    _fit(d,c["takeaway"],(takeaway_box[0]+30,takeaway_box[1]+16,takeaway_box[2]-30,takeaway_box[3]-14),max_size=31,min_size=25,fill=WHITE,align="center",font_fn=_gothic_bold_font,line_gap=.10)
+
+    d.line((260,1730,820,1730),fill=gold,width=2)
+    _fit(d,"OMASU TAROT NOTE",(300,1765,780,1810),max_size=25,min_size=22,fill=MUTED,align="center",font_fn=_gothic_font)
+    _fit(d,"@omasu_horoscope",(300,1820,780,1870),max_size=25,min_size=22,fill=MUTED,align="center",font_fn=_gothic_font)
+    return im
+
 def _render_evening(c:dict[str,Any],day:date)->Image.Image:
     validate_layout_regions("evening")
+    if c.get("content_kind")=="tarot_insight":
+        return _render_tarot_insight(c,day)
     if c.get("content_kind")=="tarot_knowledge":
         return _render_tarot(c,day)
     im=_apply_daily_palette(_master("evening-approved.png"),day,"evening"); d=ImageDraw.Draw(im)
@@ -488,14 +573,16 @@ def validate_story_asset(path:str|Path,content:dict[str,Any],day:date)->dict[str
         },
         "asset_bytes":size,
     }
-    if content.get("content_kind")=="tarot_knowledge":
-        art_path=_required_tarot_art(content["card_number"])
-        with Image.open(art_path) as art:
-            art.verify()
+    if content.get("content_kind") in {"tarot_knowledge","tarot_insight"}:
+        card_numbers=[content["card_number"]] if content.get("content_kind")=="tarot_knowledge" else content["card_numbers"]
+        art_paths=[_required_tarot_art(number) for number in card_numbers]
+        for art_path in art_paths:
+            with Image.open(art_path) as art:
+                art.verify()
         report["tarot_card_art"]={
             "required":True,
             "detected":True,
-            "card_number":content["card_number"],
-            "asset":art_path.name,
+            "card_numbers":card_numbers,
+            "assets":[path.name for path in art_paths],
         }
     return report

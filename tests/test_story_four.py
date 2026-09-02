@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from PIL import Image,ImageChops,ImageDraw,ImageStat
 import backend.story_automation_four as automation
-from backend.story_four import SLOTS,TAROT_START_DATE,TAROT_TOPICS,build_slot_content,render_slot_story,solar_term,validate_content_depth
+from backend.story_four import SLOTS,TAROT_REFRESH_DATE,TAROT_START_DATE,TAROT_POSTS,TAROT_TOPICS,build_slot_content,render_slot_story,solar_term,validate_content_depth
 from backend.story_quality import (
     MOBILE_BODY_MIN,
     MOBILE_SUPPORT_MIN,
@@ -125,6 +125,35 @@ def test_tarot_topics_cover_general_knowledge_without_a_sequential_card_teaser()
     assert len(set(topics))==len(TAROT_TOPICS)
     assert card_numbers[:3] != [0,1,2]
 
+def test_refreshed_tarot_rotation_starts_with_a_comparison_and_keeps_real_card_art():
+    item=build_slot_content(facts(TAROT_REFRESH_DATE),"evening")
+    assert item["content_kind"]=="tarot_insight"
+    assert item["format"]=="comparison"
+    assert item["card_numbers"]==[11,4]
+    assert item["headline"]=="同じ『決める』でも、\n何が違う？"
+    assert len(item["points"])==2
+    assert validate_content_depth(item)["passed"]
+
+def test_refreshed_tarot_rotation_balances_knowledge_and_reading_formats():
+    formats=[];keys=[]
+    for offset in range(len(TAROT_POSTS)):
+        item=build_slot_content(facts(TAROT_REFRESH_DATE+timedelta(days=offset)),"evening")
+        formats.append(item["format"]);keys.append(item["post_key"])
+        assert 1<=len(item["card_numbers"])<=3
+        assert len(item["card_numbers"])==len(item["card_labels"])
+        assert validate_content_depth(item)["passed"]
+    assert set(formats)=={"comparison","daily","symbol","choice","spread"}
+    assert len(set(keys))==len(TAROT_POSTS)
+    assert all(left!=right for left,right in zip(formats,formats[1:]))
+
+def test_refreshed_tarot_renders_one_two_and_three_card_formats(tmp_path):
+    for day in (TAROT_REFRESH_DATE,TAROT_REFRESH_DATE+timedelta(days=1),TAROT_REFRESH_DATE+timedelta(days=2)):
+        item=build_slot_content(facts(day),"evening")
+        path=render_slot_story(item,day,tmp_path/f"{item['post_key']}.jpg")
+        report=validate_story_asset(path,item,day)
+        assert report["passed"]
+        assert report["tarot_card_art"]["card_numbers"]==item["card_numbers"]
+
 def test_seven_designs_rotate_without_consecutive_repeats():
     for slot in SLOTS:
         names=[design_variant(date(2026,7,17)+timedelta(days=i),slot)["name"] for i in range(7)]
@@ -162,6 +191,18 @@ def test_night_edge_circle_never_enters_the_column_text_area():
     motif_only=ImageChops.difference(tint,decorated)
     assert motif_only.getbbox() is not None
     assert motif_only.crop((85,900,995,1680)).getbbox() is None
+
+def test_large_left_circle_and_dots_are_removed_from_every_slot():
+    start=date(2026,7,19)
+    for slot in ("morning","evening","night"):
+        day=next(start+timedelta(days=offset) for offset in range(28) if design_variant(start+timedelta(days=offset),slot)["motif_index"]==2)
+        base=Image.new("RGB",(1080,1920),(246,242,232))
+        theme=design_variant(day,slot)
+        tint_amount=.055 if slot=="night" else .075
+        tinted=Image.blend(base,Image.new("RGB",base.size,theme["primary"]),tint_amount)
+        decorated=_decorate(base,day,slot)
+        # Rounded border may remain at x=18; the deleted circle occupied x=60..120.
+        assert ImageChops.difference(tinted,decorated).crop((60,1200,125,1680)).getbbox() is None
 
 def test_column_title_uses_the_bundled_rounded_handwritten_font():
     family,_style=_handwritten_gothic_font(48).getname()

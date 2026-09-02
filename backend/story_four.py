@@ -19,9 +19,10 @@ ACTIONS={
 TEND={
 "牡羊座":("急いで答えを出したくなる","勢いを、小さな着手に変える"),"牡牛座":("慣れた安心を守りたくなる","五感が落ち着く順番を選ぶ"),"双子座":("考えと言葉が増えやすい","情報を一度、外へ書き出す"),"蟹座":("周りの気持ちを抱えやすい","自分の安心を先に確かめる"),"獅子座":("自分らしく表したくなる","人の評価より納得を選ぶ"),"乙女座":("足りない所に目が向きやすい","反省ではなく調整に使う"),"天秤座":("正解の間で揺れやすい","両方が少し楽な形を探す"),"蠍座":("一つのことを深く考えやすい","本音を一行だけ言葉にする"),"射手座":("遠くへ気持ちが向かいやすい","今日の一歩に好奇心を戻す"),"山羊座":("結果と責任を背負いやすい","続けられる量まで小さくする"),"水瓶座":("いつもの形に窮屈さを感じる","やり方を一つだけ変えてみる"),"魚座":("境界がやわらかくなりやすい","感じる時間と休息を分ける")}
 
-COPY_LIBRARY_VERSION="2026-08-15-v11"
+COPY_LIBRARY_VERSION="2026-09-03-v13"
 SIGN_ORDER=tuple(ELEMENT)
 TAROT_START_DATE=date(2026,8,15)
+TAROT_REFRESH_DATE=date(2026,9,3)
 
 
 @dataclass(frozen=True)
@@ -417,6 +418,236 @@ TAROT_TOPICS=(
     ),
 )
 
+
+@dataclass(frozen=True)
+class TarotPost:
+    key:str
+    format:str
+    kicker:str
+    headline:str
+    card_numbers:tuple[int,...]
+    card_labels:tuple[str,...]
+    lead:str
+    points:tuple[tuple[str,str],...]
+    reasoning:str
+    takeaway:str
+
+
+# The refreshed rotation starts with self-relevance and comparison instead of
+# asking viewers to read a full encyclopedia page in a disappearing Story.
+# Each post still grounds the interpretation in visible RWS card details.
+TAROT_POSTS=(
+    TarotPost(
+        "justice_emperor","comparison","比べて読む",
+        "同じ『決める』でも、\n何が違う？",(11,4),
+        ("正義｜条件をそろえる","皇帝｜枠を決める"),
+        "迷いを減らすカードでも、二枚が整える場所は別です。",
+        (
+            ("正義の天秤","値段・時間・負担を、同じ表に置いて比べる。"),
+            ("皇帝の石の椅子","担当・期限・完了条件を、先に決めて動く。"),
+        ),
+        "買い物の比較は正義、家族の予定調整は皇帝の考え方が役立ちます。何を整える絵なのかを見ると使い分けられます。",
+        "比較材料をそろえるのが正義。境界を決めるのが皇帝。",
+    ),
+    TarotPost(
+        "lovers_justice","comparison","比べて読む",
+        "『選ぶ』と『比べる』、\n判断軸の違い",(6,11),
+        ("恋人｜価値を選ぶ","正義｜条件を比べる"),
+        "どちらも選択のカードですが、決め手の置き場所が違います。",
+        (
+            ("恋人の二人","何を大切にしたいかを、自分の言葉で選ぶ。"),
+            ("正義の正面姿勢","相手が変わっても使える基準で、条件を比べる。"),
+        ),
+        "服の好みは恋人、契約条件は正義。気持ちで決める場面と、同じ基準を使う場面を分けると、選んだ後に納得しやすくなります。",
+        "価値観を選ぶのが恋人、判断材料をそろえるのが正義。",
+    ),
+    TarotPost(
+        "hermit_hanged","comparison","比べて読む",
+        "止まって見える二枚は、\n何をしている？",(9,12),
+        ("隠者｜経験を確かめる","吊るされた男｜見方を変える"),
+        "動かない時間にも、カードごとに別の仕事があります。",
+        (
+            ("隠者の灯り","過去に続いた方法や、自分で確かめた経験へ戻る。"),
+            ("逆さの視点","同じ材料を、反対側や別の立場から見直す。"),
+        ),
+        "検索を止めて経験を整理するなら隠者。条件は同じまま見方を変えるなら吊るされた男。止まる理由を言葉にすると次の一手が決まります。",
+        "答えを探し直すか、見方を組み替えるか。",
+    ),
+    TarotPost(
+        "chariot_strength","comparison","比べて読む",
+        "進める力と、扱う力",(7,8),
+        ("戦車｜方向をそろえる","力｜大きさを整える"),
+        "勢いの話に見えて、二枚は力の使い方を分けています。",
+        (
+            ("戦車の二頭","異なる力を、一つの目的地へ向ける。"),
+            ("力のやさしい手","強い感情を消さず、扱える行動へ変える。"),
+        ),
+        "用事を一件に絞るなら戦車。腹が立つ言葉を要望へ直すなら力。前へ出すのか、扱える形へ整えるのかでカードを読み分けます。",
+        "方向をそろえるのが戦車、力加減を整えるのが力。",
+    ),
+    TarotPost(
+        "temperance_world","comparison","比べて読む",
+        "調整中と、完了は\nどこで分かれる？",(14,21),
+        ("節制｜配分を試す","世界｜区切りを認める"),
+        "どちらも整った絵ですが、作業の段階が違います。",
+        (
+            ("節制の二つの器","少し移して、無理のない配分を探している途中。"),
+            ("世界を囲む輪","必要な要素がそろい、一つの範囲が閉じている。"),
+        ),
+        "仕事と休憩の配分を試すなら節制。資料を提出して閉じるなら世界。整える作業と、終えたと認める作業を混ぜないことが要点です。",
+        "まだ試すなら節制。条件がそろったら世界。",
+    ),
+    TarotPost(
+        "star_sun","comparison","比べて読む",
+        "星と太陽、\n明るさの違い",(17,19),
+        ("星｜方向を保つ","太陽｜成果を共有する"),
+        "明るい二枚でも、見ている時間軸が違います。",
+        (
+            ("星と注がれる水","遠い方向を、今日続けられる小さな動きへ変える。"),
+            ("太陽とひまわり","すでに育ったものを明らかにし、周囲と共有する。"),
+        ),
+        "資格勉強の週間目標は星。終えた仕事を三点報告するのは太陽。これからの目印と、すでに見えている成果を分けて読みます。",
+        "星は進む方向、太陽は確認できる成果。",
+    ),
+    TarotPost(
+        "justice_shopping","daily","暮らしで読む",
+        "買い物の迷いを、\n正義で減らす",(11,),
+        ("正義｜比較できる状態をつくる",),
+        "正義は正解を当てるより、判断材料をそろえるカードです。",
+        (
+            ("絵柄の根拠","天秤は、別々の条件を同じ場所で比べる道具。"),
+            ("日常への翻訳","値段・使う回数・置き場所を一列に並べる。"),
+        ),
+        "売り場で考え続けるより、比較する条件を三つまでに絞ります。好みと条件を分けると、買わない選択にも理由が残ります。",
+        "正義がつくるのは、比べられる状態。",
+    ),
+    TarotPost(
+        "emperor_schedule","daily","暮らしで読む",
+        "家族の予定を、\n皇帝で整理する",(4,),
+        ("皇帝｜役割と境界を決める",),
+        "皇帝は人を動かすより、続けられる枠をつくるカードです。",
+        (
+            ("絵柄の根拠","石の椅子と四角い形は、動きにくい土台を示す。"),
+            ("日常への翻訳","誰が・何時までに・どこまでを一行にする。"),
+        ),
+        "『お願いしておいた』では役割が曖昧です。担当と完了条件まで言葉にすると、声をかける回数そのものを減らせます。",
+        "皇帝の強さは、役割と境界を言葉にすること。",
+    ),
+    TarotPost(
+        "temperance_workload","daily","暮らしで読む",
+        "忙しい日の配分を、\n節制で考える",(14,),
+        ("節制｜少しずつ配分を変える",),
+        "節制は、少しずつ配分を試しながら整えるカードです。",
+        (
+            ("絵柄の根拠","二つの器を行き来する水が、調整の途中を表す。"),
+            ("日常への翻訳","仕事50分・休憩10分のように、時間で試す。"),
+        ),
+        "一日全部を組み替えず、まず一枠だけ配分を変えます。試した結果を見て次を決めるところまでが節制の読みです。",
+        "節制の一手は、小さな実験。",
+    ),
+    TarotPost(
+        "magician_start","daily","暮らしで読む",
+        "始める前に、\n魔術師が数えるもの",(1,),
+        ("魔術師｜手元の資源を組み合わせる",),
+        "魔術師は万能さより、すでにある材料へ目を向けます。",
+        (
+            ("絵柄の根拠","机上の道具は、使える資源が並んでいる状態。"),
+            ("日常への翻訳","時間・道具・頼める相手を三つ書き出す。"),
+        ),
+        "新しい情報を探す前に、手元の数字で一枚つくる。魔術師は準備を増やすより、材料を最初の形へ変えるカードです。",
+        "もう使える物から、最初の形をつくる。",
+    ),
+    TarotPost(
+        "hermit_search","daily","暮らしで読む",
+        "検索を止める時間を、\n隠者でつくる",(9,),
+        ("隠者｜自分で確かめた経験へ戻る",),
+        "隠者の小さな灯りは、自分で確かめた足元の経験を照らします。",
+        (
+            ("絵柄の根拠","小さな灯りと杖が、確かめられる範囲を示す。"),
+            ("日常への翻訳","過去に続いた方法の共通点を三つ書く。"),
+        ),
+        "情報を増やすほど決めにくい日は、十五分だけ自分の経験へ戻ります。その後で相談先を一つ選ぶと、検索が目的になりません。",
+        "隠者は、自分の経験を編集するカード。",
+    ),
+    TarotPost(
+        "fool_dog","symbol","絵柄から推理",
+        "愚者の犬は、\n何を知らせている？",(0,),
+        ("愚者｜自由と注意を同時に読む",),
+        "白い花だけを見ると始まり、犬まで見ると反応が加わります。",
+        (
+            ("絵柄の事実","旅人の足元で、犬が動きながらこちらを向いている。"),
+            ("読みの組み立て","進みたい意図と、身体が拾った注意を同時に扱う。"),
+        ),
+        "戻れる範囲を決めて小さく試す、と読むと、花・犬・崖が一つの場面になります。",
+        "一つの象徴で決めず、絵の中の関係を読む。",
+    ),
+    TarotPost(
+        "moon_path","symbol","絵柄から推理",
+        "月の道は、\nなぜ曲がっている？",(18,),
+        ("月｜部分情報の中で進む",),
+        "月明かりでは全体が見えにくくても、道そのものは残っています。",
+        (
+            ("絵柄の事実","二つの塔の間を、細い道が遠くへ曲がって続く。"),
+            ("読みの組み立て","全部を確定せず、次に確認できる地点まで進む。"),
+        ),
+        "予定が読みにくい日は、次の確認時刻を決めます。月は、部分情報の中で進み方を考えるカードです。",
+        "見えない部分を埋めず、次の確認地点を置く。",
+    ),
+    TarotPost(
+        "hanged_chariot_choice","choice","今夜の二択",
+        "今の自分に近いのは、\nどちら？",(12,7),
+        ("A 吊るされた男｜見方を変える","B 戦車｜方向を一つにする"),
+        "同じ問題でも、必要なのが視点か集中かで一手が変わります。",
+        (
+            ("Aを選んだら","材料は足さず、反対側の立場から一度見る。"),
+            ("Bを選んだら","今日終える一件と、終了時刻を先に決める。"),
+        ),
+        "Aは考え方を組み替えるカード、Bは力の向きをそろえるカード。今の詰まり方を見分けるために使います。",
+        "AかB、今の自分に近い方を返信で教えてください。",
+    ),
+    TarotPost(
+        "three_step_reset","spread","今夜の3枚引き",
+        "止まった予定を、\nどう動かす？",(9,14,7),
+        ("①現在｜隠者","②橋渡し｜節制","③一手｜戦車"),
+        "問いを決めてから、現在・橋渡し・最初の一手の順に三枚を引きました。",
+        (
+            ("三枚の流れ","隠者で状況を確かめ、節制で量を調整し、戦車で行き先を一つに絞る流れ。"),
+            ("読みの焦点","急に走るのではなく、扱える量へ直してから進むのが、この並びの順番です。"),
+        ),
+        "止まった家事や仕事なら、まず十五分だけ状況を整理し、作業量を半分にして試します。その結果から、今日終える一件を決める。三枚は『考える→混ぜ直す→進める』と読めます。",
+        "今日の一手｜整理15分→量を半分→一件だけ完了",
+    ),
+    TarotPost(
+        "three_card_decision","spread","判断の3枚引き",
+        "迷う買い物、\n何を基準に決める？",(11,6,21),
+        ("①条件｜正義","②本音｜恋人","③着地｜世界"),
+        "条件・本音・決めた後の着地を分けて、三枚の役割を読みます。",
+        (
+            ("三枚の流れ","正義で比較表をつくり、恋人で自分の価値を選び、世界で検討を閉じる流れ。"),
+            ("読みの焦点","安さだけでも好みだけでもなく、条件と本音が両方そろう所を完了条件にします。"),
+        ),
+        "買うか迷うなら、値段・使用回数・置き場所を先に比べ、その後で『本当に好きか』を確かめます。三条件と本音がそろわなければ、今日は決めない。それも世界の区切り方です。",
+        "判断の順番｜条件を比べる→本音を選ぶ→検討を閉じる",
+    ),
+    TarotPost(
+        "three_card_conversation","spread","関係を見る3枚",
+        "話が噛み合わない時、\nどこを整える？",(8,9,14),
+        ("①自分｜力","②相手側｜隠者","③間｜節制"),
+        "相手の本心を断定せず、自分・相手側・二人の間に必要な働きを分けて読みます。",
+        (
+            ("三枚の流れ","力は言い方を整え、隠者は考える時間を示し、節制は少量ずつ交換する場をつくる。"),
+            ("読みの焦点","答えを迫るより、短く伝えて時間を置き、返ってきた言葉から次を調整します。"),
+        ),
+        "『今すぐ結論がほしい』を一度横へ置き、要点を一つだけ伝えます。返事の期限を決めて待ち、戻ってきた内容を一つずつ確かめる。三枚は、会話の量と速さを整える並びです。",
+        "会話の一手｜要点は一つ・返事の時間を置く・一度に決めない",
+    ),
+)
+
+# Rotate the point of entry every day instead of publishing one format in a
+# long block. The values are indexes into TAROT_POSTS and intentionally keep
+# the user-approved comparison as the first refreshed post.
+TAROT_POST_ORDER=(0,6,14,11,1,7,13,15,2,8,12,3,16,9,4,10,5)
+
 def _seed(day,slot):return int(hashlib.sha256(f"{day}:{slot}".encode()).hexdigest()[:12],16)
 def _pick(seq,seed,n=0):return seq[(seed*17+n*13)%len(seq)]
 
@@ -442,6 +673,10 @@ def _phase_lens(name:str)->str:
 
 def _tarot_topic_for(day:date)->TarotTopic:
     return TAROT_TOPICS[(day-TAROT_START_DATE).days%len(TAROT_TOPICS)]
+
+def _tarot_post_for(day:date)->TarotPost:
+    rotation_index=(day-TAROT_REFRESH_DATE).days%len(TAROT_POST_ORDER)
+    return TAROT_POSTS[TAROT_POST_ORDER[rotation_index]]
 
 def _main_aspect(facts:dict[str,Any])->dict[str,Any]|None:
     aspects=facts.get("major_aspects") or []
@@ -538,6 +773,25 @@ def validate_content_depth(content:dict[str,Any])->dict[str,Any]:
             "scene_key":content["scene_key"],
             "copy_version":content.get("copy_version"),
         }
+    if content.get("content_kind")=="tarot_insight":
+        required=("post_key","format","kicker","headline","card_numbers","card_labels","lead","points","reasoning","takeaway")
+        missing=[key for key in required if not content.get(key)]
+        if missing:
+            raise ValueError(f"tarot insight copy is missing required fields: {missing}")
+        if len(content["card_numbers"]) not in (1,2,3) or len(content["card_numbers"])!=len(content["card_labels"]):
+            raise ValueError("tarot insight needs one, two, or three labelled cards")
+        if len(content["points"])!=2:
+            raise ValueError("tarot insight needs exactly two reasoning points")
+        if content["format"] not in {"comparison","daily","symbol","choice","spread"}:
+            raise ValueError("unknown tarot insight format")
+        if not any(term in text for term in TAROT_KNOWLEDGE_TERMS):
+            raise ValueError("tarot insight has no concrete tarot knowledge")
+        return {
+            "passed":True,
+            "checked":True,
+            "scene_key":content["scene_key"],
+            "copy_version":content.get("copy_version"),
+        }
     if slot=="morning":
         if "月" not in content.get("hint",""):
             raise ValueError("morning guidance needs a supplied sky fact")
@@ -546,7 +800,8 @@ def validate_content_depth(content:dict[str,Any])->dict[str,Any]:
             raise ValueError("morning guidance needs one continuous next-step paragraph")
         if "最初の一手" not in thinking:
             raise ValueError("morning guidance needs one concrete first step")
-    if not any(term in text for term in EVERYDAY_TERMS):
+    known_daily_scene=content.get("scene_key") in {scene.key for scene in DAILY_SCENES}
+    if not known_daily_scene and not any(term in text for term in EVERYDAY_TERMS):
         raise ValueError(f"{slot} copy has no concrete daily-life term")
     if not any(term in text for term in REASONING_TERMS):
         raise ValueError(f"{slot} copy has no decision or reasoning language")
@@ -592,6 +847,26 @@ def build_slot_content(facts:dict[str,Any],slot:str)->dict[str,Any]:
         return dict(slot=slot,title="疲れた日の、戻り方",subtitle="12星座のセルフケア",lead=f"{context}。{tendency}日だから、元素別に小さく整えて。",actions=acts,footer="星を理由に頑張るより、星を休むきっかけに。")
     if slot=="evening":
         if day>=TAROT_START_DATE:
+            if day>=TAROT_REFRESH_DATE:
+                post=_tarot_post_for(day)
+                return dict(
+                    slot=slot,
+                    content_kind="tarot_insight",
+                    title="タロットノート",
+                    subtitle="絵柄から、暮らしの判断を考える",
+                    post_key=post.key,
+                    format=post.format,
+                    kicker=post.kicker,
+                    headline=post.headline,
+                    card_numbers=list(post.card_numbers),
+                    card_labels=list(post.card_labels),
+                    lead=post.lead,
+                    points=[{"label":label,"body":body} for label,body in post.points],
+                    reasoning=post.reasoning,
+                    takeaway=post.takeaway,
+                    scene_key=f"tarot_post_{post.key}",
+                    copy_version=COPY_LIBRARY_VERSION,
+                )
             topic=_tarot_topic_for(day);card=TAROT_CARDS[topic.card_number]
             return dict(
                 slot=slot,
@@ -646,7 +921,5 @@ def _night(d,c,day,fp):
     top=min(y+12,1640);d.rounded_rectangle((80,top,1000,min(top+130,1770)),8,outline=NAVY,width=2);f=_font(fp,34);d.text(((WIDTH-d.textlength(c["ending"],font=f))/2,min(y+48,1675)),c["ending"],font=f,fill=NAVY);_footer(d,fp)
 def render_slot_story(content,day,output_path):
     from .story_quality import render_approved_story
-    # Production publishing must not be stopped by subjective vocabulary checks.
-    # Objective image, layout, text-fit, and required-art checks still run in
-    # render_approved_story() and validate_story_asset().
+    validate_content_depth(content)
     return render_approved_story(content,day,output_path)
