@@ -16,9 +16,9 @@ on:
     - cron: "55 1 * * *"   # 10:55 JST -> column primary at 11:00
     - cron: "10 2 * * *"   # 11:10 JST -> column backup
     - cron: "25 2 * * *"   # 11:25 JST -> column watchdog
-    - cron: "55 7 * * *"   # 16:55 JST -> tarot primary at 17:00
-    - cron: "10 8 * * *"   # 17:10 JST -> tarot backup
-    - cron: "25 8 * * *"   # 17:25 JST -> tarot watchdog
+    - cron: "55 7 * * *"   # 16:55 JST -> dictionary primary at 17:00
+    - cron: "10 8 * * *"   # 17:10 JST -> dictionary backup
+    - cron: "25 8 * * *"   # 17:25 JST -> dictionary watchdog
   workflow_dispatch:
     inputs:
       slot:

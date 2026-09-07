@@ -55,7 +55,10 @@ def test_scheduled_copy_has_daily_life_and_reasoning_depth():
         day=date(2026,7,17)+timedelta(days=offset)
         for slot in ("morning","night","evening"):
             report=validate_content_depth(build_slot_content(facts(day),slot))
-            assert report["passed"] and report["checked"]
+            assert report["passed"]
+            # Approved programs no longer reject prose based on keyword depth.
+            expected_new = day >= date(2026,9,7) and (slot != "morning" or day > date(2026,9,7))
+            assert report["checked"] is (not expected_new)
 
 def test_morning_translates_the_supplied_sky_into_reasoning_and_action():
     item=build_slot_content(facts(date(2026,8,15)),"morning")
@@ -134,7 +137,9 @@ def test_refreshed_tarot_rotation_starts_with_a_comparison_and_keeps_real_card_a
     assert len(item["points"])==2
     assert validate_content_depth(item)["passed"]
 
-def test_refreshed_tarot_rotation_balances_knowledge_and_reading_formats():
+def test_legacy_tarot_rotation_balances_knowledge_and_reading_formats(monkeypatch):
+    import backend.story_program as program
+    monkeypatch.setattr(program,"START",date(2099,1,1))
     formats=[];keys=[]
     for offset in range(len(TAROT_POSTS)):
         item=build_slot_content(facts(TAROT_REFRESH_DATE+timedelta(days=offset)),"evening")
@@ -189,7 +194,8 @@ def test_night_edge_circle_never_enters_the_column_text_area():
     tint=Image.blend(base,Image.new("RGB",base.size,theme["primary"]),0.055)
     decorated=_decorate(base,day,"night")
     motif_only=ImageChops.difference(tint,decorated)
-    assert motif_only.getbbox() is not None
+    # The user asked to remove the circle entirely; absence is intentional.
+    assert motif_only.getbbox() is None
     assert motif_only.crop((85,900,995,1680)).getbbox() is None
 
 def test_large_left_circle_and_dots_are_removed_from_every_slot():
@@ -236,19 +242,25 @@ def test_morning_palette_changes_are_obvious_on_a_phone():
         changed=sum(histogram[12:])/(1080*1920)
         assert changed>0.08
 
-def test_workflow_schedules_only_morning_column_and_evening():
+def test_workflow_schedules_four_programs_with_three_chances_each():
     workflow=(Path(__file__).parents[1]/".github/workflows/daily-instagram-story.yml").read_text(encoding="utf-8")
-    assert workflow.count('cron:')==3
-    for cron in ('41 20 * * *','41 1 * * *','41 7 * * *'):
+    assert workflow.count('cron:')==12
+    for cron in ('43 17 * * *','31 18 * * *','19 19 * * *','55 22 * * *','10 23 * * *','25 23 * * *','55 1 * * *','10 2 * * *','25 2 * * *','55 7 * * *','10 8 * * *','25 8 * * *'):
         assert cron in workflow
     for removed in ('58 20 * * *','8 21 * * *','18 21 * * *','30 0 * * *','40 0 * * *','50 0 * * *','30 9 * * *','40 9 * * *','50 9 * * *','11 0 * * *','11 9 * * *'):
         assert removed not in workflow
-    assert 'PUBLISH_AT="06:00"' in workflow
+    assert 'PUBLISH_AT="05:00"' in workflow
+    assert 'PUBLISH_AT="08:00"' in workflow
     assert 'PUBLISH_AT="11:00"' in workflow
     assert 'PUBLISH_AT="17:00"' in workflow
-    assert 'sleep "${WAIT_SECONDS}"' in workflow
-    assert '--retry' not in workflow
-    assert '2026-08-15' in workflow
+    assert 'timeout-minutes: 180' in workflow
+    assert 'sleep "${FINAL_WAIT}"' in workflow
+    post_command = workflow.split('curl --fail-with-body')[1].split('> story-response.json')[0]
+    assert '--retry' not in post_command
+    assert '2026-09-08' in workflow
+    assert 'wait_until_slot:' in workflow and 'dry_run:' in workflow
+    assert "inputs.dry_run != true" in workflow
+    assert "steps.published-marker.outputs.cache-hit != 'true'" in workflow
     assert '          - noon' not in workflow
     assert '          - night' not in workflow
 

@@ -570,6 +570,9 @@ def render_approved_story(content:dict[str,Any],day:date,output_path:str|Path)->
     return path
 
 def validate_story_asset(path:str|Path,content:dict[str,Any],day:date)->dict[str,Any]:
+    if content.get("content_kind") in {"dictionary_20260907","horoscope_20260907"}:
+        from .story_program_render import validate_program_asset
+        return validate_program_asset(path,content,day)
     asset=Path(path)
     if not asset.is_file():raise RuntimeError(f"Story quality check failed: asset is missing: {asset}")
     layout=validate_layout_regions(content["slot"])

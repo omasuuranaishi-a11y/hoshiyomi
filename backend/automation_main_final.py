@@ -19,15 +19,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @app.get("/api/automation/story-version")
 def story_version():
-    from .story_program import VERSION, START
-    return {"version": VERSION, "effective_from_jst": START.isoformat()}
+    from .story_program import VERSION, START, editorial_stock
+    return {"version": VERSION, "effective_from_jst": START.isoformat(),
+            "editorial_stock": editorial_stock()}
 
 
 @app.get("/story-assets/{target_date}/{filename}", response_class=FileResponse)
 def story_asset(target_date: str, filename: str) -> FileResponse:
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", target_date):
         raise HTTPException(status_code=404, detail="not found")
-    if not re.fullmatch(r"(?:morning|noon|evening|night)\.jpg", filename):
+    if not re.fullmatch(r"(?:preview-)?(?:morning|noon|evening|night)\.jpg", filename):
         raise HTTPException(status_code=404, detail="not found")
     asset = ROOT / "generated" / "story_assets" / target_date / filename
     if not asset.is_file():

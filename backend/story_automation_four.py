@@ -15,16 +15,17 @@ def run_story_slot(target_date:str|date|None=None,*,slot:str="morning",dry_run:b
         raise ValueError("slot must be morning, noon, evening, or night")
     target=_target_date(target_date)
     generated=Path(generated_root or DEFAULT_GENERATED_ROOT)
-    record_path=generated/"story_runs"/f"{target.isoformat()}-{slot}.json"
+    record_suffix="-preview" if dry_run else ""
+    record_path=generated/"story_runs"/f"{target.isoformat()}-{slot}{record_suffix}.json"
     old=_read_json(record_path)
     if old and old.get("status")=="published" and not force and not dry_run:
         return {**old,"skipped":True,"reason":"already_published"}
 
-    hour={"morning":6,"noon":12,"evening":18,"night":9}[slot]
+    hour={"morning":5,"noon":8,"evening":17,"night":11}[slot]
     facts=build_daily_sky(target,reading_hour=hour)
     content=build_slot_content(facts,slot)
     content["design_variant"]=design_variant(target,slot)["name"]
-    name=f"{slot}.jpg"
+    name=f"{'preview-' if dry_run else ''}{slot}.jpg"
     path=generated/"story_assets"/target.isoformat()/name
     base=os.getenv("PUBLIC_BASE_URL","http://localhost:8000").rstrip("/")
     url=f"{base}/story-assets/{quote(target.isoformat(),safe='')}/{name}"
