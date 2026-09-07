@@ -1,4 +1,4 @@
-name: Three Daily Instagram Stories
+name: Four Daily Instagram Stories
 
 on:
   schedule:
@@ -10,6 +10,9 @@ on:
     - cron: "43 17 * * *"  # 02:43 JST -> morning primary waits for 05:00
     - cron: "31 18 * * *"  # 03:31 JST -> second morning chance
     - cron: "19 19 * * *"  # 04:19 JST -> third morning chance
+    - cron: "55 22 * * *"  # 07:55 JST -> 12 signs primary at 08:00
+    - cron: "10 23 * * *"  # 08:10 JST -> 12 signs backup
+    - cron: "25 23 * * *"  # 08:25 JST -> 12 signs watchdog
     - cron: "55 1 * * *"   # 10:55 JST -> column primary at 11:00
     - cron: "10 2 * * *"   # 11:10 JST -> column backup
     - cron: "25 2 * * *"   # 11:25 JST -> column watchdog
@@ -25,12 +28,23 @@ on:
         type: choice
         options:
           - morning
+          - horoscope
           - column
           - evening
       target_date:
         description: Optional YYYY-MM-DD in JST
         required: false
         type: string
+      wait_until_slot:
+        description: Wait until the selected slot time in JST (never publish early)
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: Render preview only; do not publish or save a published marker
+        required: false
+        default: false
+        type: boolean
       force_repost:
         description: Repost even when the date/slot is already recorded
         required: false
@@ -58,19 +72,33 @@ jobs:
           MANUAL_SLOT: ${{ inputs.slot }}
           MANUAL_TARGET_DATE: ${{ inputs.target_date }}
           EVENT_NAME: ${{ github.event_name }}
+          WAIT_UNTIL_SLOT: ${{ inputs.wait_until_slot }}
         run: |
           case "${SCHEDULE}" in
             "43 17 * * *"|"31 18 * * *"|"19 19 * * *"|"55 19 * * *"|"10 20 * * *"|"25 20 * * *"|"41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
+            "55 22 * * *"|"10 23 * * *"|"25 23 * * *") SLOT="noon"; PUBLISH_AT="08:00" ;;
             "55 1 * * *"|"10 2 * * *"|"25 2 * * *"|"41 1 * * *") SLOT="night"; PUBLISH_AT="11:00" ;;
             "55 7 * * *"|"10 8 * * *"|"25 8 * * *"|"41 7 * * *") SLOT="evening"; PUBLISH_AT="17:00" ;;
             *) SLOT="${MANUAL_SLOT:-morning}" ;;
           esac
           if [ "${SLOT}" = "column" ]; then SLOT="night"; fi
+          if [ "${SLOT}" = "horoscope" ]; then SLOT="noon"; fi
+          case "${SLOT}" in
+            morning) PUBLISH_AT="05:00" ;;
+            noon) PUBLISH_AT="08:00" ;;
+            night) PUBLISH_AT="11:00" ;;
+            evening) PUBLISH_AT="17:00" ;;
+            *) echo "Unknown slot"; exit 1 ;;
+          esac
           TODAY_JST="$(TZ=Asia/Tokyo date +%F)"
           TARGET_DATE="${MANUAL_TARGET_DATE:-${TODAY_JST}}"
           if [ "${EVENT_NAME}" = "schedule" ] && [ "${TODAY_JST}" \< "2026-08-15" ]; then
             echo "Automatic Instagram stories start on 2026-08-15 JST; skipping ${TODAY_JST}."
             exit 0
+          fi
+          if [ "${SLOT}" = "noon" ] && [ "${TARGET_DATE}" \< "2026-09-08" ]; then
+            echo "The new 08:00 program starts September 8; no backfill."
+            exit 1
           fi
           PUBLISH_EPOCH=0
           if [ "${EVENT_NAME}" = "schedule" ]; then
@@ -93,6 +121,13 @@ jobs:
               echo "The scheduler started late; publishing immediately."
             fi
           fi
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ] && [ "${WAIT_UNTIL_SLOT}" = "true" ]; then
+            PUBLISH_EPOCH="$(TZ=Asia/Tokyo date -d "${TARGET_DATE} ${PUBLISH_AT}:00" +%s)"
+            WAIT_SECONDS="$((PUBLISH_EPOCH - $(date +%s)))"
+            if [ "${WAIT_SECONDS}" -gt 10800 ]; then
+              echo "Manual wait exceeds the safe three-hour limit."; exit 1
+            fi
+          fi
           echo "slot=${SLOT}" >> "${GITHUB_OUTPUT}"
           echo "target_date=${TARGET_DATE}" >> "${GITHUB_OUTPUT}"
           echo "publish_epoch=${PUBLISH_EPOCH}" >> "${GITHUB_OUTPUT}"
@@ -106,7 +141,7 @@ jobs:
 
       - name: Generate and publish one story
         id: publish-story
-        if: inputs.mark_published_only == true || github.event_name == 'workflow_dispatch' || steps.published-marker.outputs.cache-hit != 'true'
+        if: inputs.mark_published_only == true || inputs.force_repost == true || inputs.dry_run == true || steps.published-marker.outputs.cache-hit != 'true'
         env:
           AUTOMATION_URL: ${{ secrets.AUTOMATION_URL }}
           AUTOMATION_SECRET: ${{ secrets.AUTOMATION_SECRET }}
@@ -116,9 +151,10 @@ jobs:
           MARK_PUBLISHED_ONLY: ${{ inputs.mark_published_only }}
           EVENT_NAME: ${{ github.event_name }}
           PUBLISH_EPOCH: ${{ steps.resolve.outputs.publish_epoch }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           if [ "${MARK_PUBLISHED_ONLY}" != "true" ]; then
-            if [ "${EVENT_NAME}" = "schedule" ] && [ "${PUBLISH_EPOCH:-0}" -gt 0 ]; then
+            if [ "${DRY_RUN}" != "true" ] && [ "${PUBLISH_EPOCH:-0}" -gt 0 ]; then
               # Wake the free Render service four minutes early, then publish
               # at the target epoch. The health check is read-only and safe to
               # retry; the Instagram POST below is intentionally never retried.
@@ -142,6 +178,7 @@ jobs:
               fi
             fi
             QUERY="slot=${SLOT}&target_date=${TARGET_DATE}"
+            if [ "${DRY_RUN}" = "true" ]; then QUERY="${QUERY}&dry_run=true"; fi
             if [ "${FORCE_REPOST}" = "true" ]; then
               QUERY="${QUERY}&force=true"
             fi
@@ -150,15 +187,18 @@ jobs:
             curl --fail-with-body --show-error --silent --max-time 180 \
               --request POST \
               --header "Authorization: Bearer ${AUTOMATION_SECRET}" \
-              "${AUTOMATION_URL}${SEPARATOR}${QUERY}"
+              "${AUTOMATION_URL}${SEPARATOR}${QUERY}" > story-response.json
+            cat story-response.json
+            python -c 'import json,os; r=json.load(open("story-response.json")); expected="dry_run" if os.getenv("DRY_RUN")=="true" else "published"; assert r.get("status")==expected, "No confirmed publish/preview result"'
           else
             echo "Recording ${TARGET_DATE}/${SLOT} without publishing."
           fi
+          if [ "${DRY_RUN}" = "true" ]; then exit 0; fi
           mkdir -p .story-published
           printf '%s\n' "${TARGET_DATE}/${SLOT}" > ".story-published/${TARGET_DATE}-${SLOT}.done"
 
       - name: Save persistent published marker
-        if: steps.publish-story.outcome == 'success' && steps.published-marker.outputs.cache-hit != 'true'
+        if: inputs.dry_run != true && steps.publish-story.outcome == 'success' && steps.published-marker.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: .story-published/${{ steps.resolve.outputs.target_date }}-${{ steps.resolve.outputs.slot }}.done
