@@ -17,6 +17,12 @@ from .story_automation_four import run_story_slot
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@app.get("/api/automation/story-version")
+def story_version():
+    from .story_program import VERSION, START
+    return {"version": VERSION, "effective_from_jst": START.isoformat()}
+
+
 @app.get("/story-assets/{target_date}/{filename}", response_class=FileResponse)
 def story_asset(target_date: str, filename: str) -> FileResponse:
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", target_date):

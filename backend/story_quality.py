@@ -541,7 +541,23 @@ def _render_night(c:dict[str,Any],day:date)->Image.Image:
     _fit(d,c["headline"],(105,385,975,690),max_size=82,min_size=62,align="center",line_gap=.20,font_fn=_handwritten_gothic_font)
     # One uninterrupted essay block: no labels, subheads, or boxed callout.
     _box(d,(65,860,1015,1730),paper)
-    _fit(d,c["column"],(85,900,995,1680),max_size=41,min_size=36,line_gap=.22,font_fn=_gothic_font,wrap_fn=_wrap_kinsoku)
+    if c.get("content_kind")=="column_20260907":
+        # Use actual ink bounds rather than the font's unusually tall metrics.
+        # Paragraph blanks remain a complete line, while visible lines never touch.
+        for size in (44,42,40):
+            font=_gothic_font(size)
+            lines=_wrap_kinsoku(d,c["column"],font,910)
+            step=round(size*1.36)
+            if len(lines)*step <= 780:
+                for index,line in enumerate(lines):
+                    if line:
+                        d.text((85,900+index*step),line,font=font,fill=INK,anchor="lt")
+                c["rendered_body_px"]=size
+                break
+        else:
+            raise ValueError("Column text exceeds its large-type area")
+    else:
+        _fit(d,c["column"],(85,900,995,1680),max_size=41,min_size=36,line_gap=.22,font_fn=_gothic_font,wrap_fn=_wrap_kinsoku)
     return im
 def render_approved_story(content:dict[str,Any],day:date,output_path:str|Path)->Path:
     validate_layout_regions(content["slot"])

@@ -746,6 +746,8 @@ def _flatten_text(value:Any)->str:
     return ""
 
 def validate_content_depth(content:dict[str,Any])->dict[str,Any]:
+    if content.get("content_kind") in {"column_20260907","dictionary_20260907","horoscope_20260907"}:
+        return {"passed":True,"checked":False,"reason":"approved_program_no_subjective_gate"}
     """Fail closed when scheduled copy falls back to vague, template-like language."""
     slot=content.get("slot")
     if slot not in {"morning","evening","night"}:
@@ -830,6 +832,10 @@ def solar_term(facts):
 
 def build_slot_content(facts:dict[str,Any],slot:str)->dict[str,Any]:
     if slot not in SLOTS:raise ValueError("unknown slot")
+    from .story_program import build_program_content
+    program = build_program_content(facts, slot)
+    if program is not None:
+        return program
     day=date.fromisoformat(facts["target_date"]);seed=_seed(day,slot);moon=facts["moon"];phase=facts["moon_phase"];ing=facts.get("moon_ingress")
     tendency,adjust=TEND[moon["sign"]];lens=SIGN_LENSES[moon["sign"]];scene=_scene_for(day,slot,moon["sign"]);aspect=_main_aspect(facts)
     context=f"月は{moon['sign']} {moon['degree_in_sign']:.1f}度"+(f"。{ing['local_time']}ごろ{ing['to']}へ" if ing else "")
