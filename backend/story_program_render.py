@@ -162,6 +162,10 @@ def _graphic(c,g):
 
 def render_program(content,day,path):
     if content["slot"]=="noon":
+        from .story_horoscope_celestial import START,render_celestial_horoscope
+        if day>=START:
+            return render_celestial_horoscope(content,day,path)
+    if content["slot"]=="noon":
         c=Canvas("#496e74","#e4ece7");c.header(day,content['title'])
         c.text("太陽星座から読む、今日のヒント",(85,326,1004,375),34,center=True)
         colors=("#f2e1d5","#e6ebdd","#e5edef","#e9e5ee")
@@ -193,4 +197,5 @@ def validate_program_asset(path,content,day):
         im.verify()
     check=content.get('render_check',{})
     if not check.get('overlap_free'):raise ValueError("Missing render geometry verification")
-    return {"passed":True,"text_fit_checked":True,"layout":{"overlap_free":True},"mobile_readability":check,"asset_bytes":path.stat().st_size,"design":"approved_dictionary_v2" if content['slot']=='evening' else 'approved_twelve_signs_one_sheet'}
+    design=check.get('design') or ("approved_dictionary_v2" if content['slot']=='evening' else 'approved_twelve_signs_one_sheet')
+    return {"passed":True,"text_fit_checked":True,"layout":{"overlap_free":True},"mobile_readability":check,"asset_bytes":path.stat().st_size,"design":design}

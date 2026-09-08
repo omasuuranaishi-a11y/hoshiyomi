@@ -49,7 +49,7 @@ def test_full_sheet_preserves_text_size_and_reports_actual_lines(tmp_path):
     original=[item['text'] for item in content['items']]
     path=render_program(content,day,tmp_path/'horoscope.jpg')
     assert validate_program_asset(path,content,day)['passed']
-    assert content['render_check']['body_px']==38
+    assert content['render_check']['body_px']==40
     assert content['render_check']['linebreak_policy']=='one_sentence_per_line_v1'
     assert [item['text'] for item in content['items']]==original
     assert [item['sign'] for item in content['items']]==list(SIGN_NAMES)
