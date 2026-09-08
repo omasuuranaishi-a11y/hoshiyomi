@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 START = date(2026, 9, 7)
-VERSION = "2026-09-07-four-programs-v2"
+VERSION = "2026-09-08-four-programs-v3-linebreaks"
 COLUMNS = json.loads((ROOT / "story_columns.json").read_text(encoding="utf-8"))
 DICTIONARY = json.loads((ROOT / "story_dictionary.json").read_text(encoding="utf-8"))
 SIGN_NAMES = ("牡羊座","牡牛座","双子座","蟹座","獅子座","乙女座","天秤座","蠍座","射手座","山羊座","水瓶座","魚座")

@@ -1,11 +1,20 @@
 """Large-type native rendering of the approved encyclopedia and twelve-sign sheet."""
 from pathlib import Path
 import math
+import re
 from PIL import Image, ImageDraw, ImageFont
 from .story_quality import FONT_DIR, TAROT_DIR, _wrap_kinsoku
 
 INK="#24464b"; PAPER="#f6f2e8"; GOLD="#b89b71"
 PALETTES={"iching":("#49736b","#e4ebe0"),"house4":("#537767","#e5e9dd"),"numerology":("#a87559","#f0dfd3"),"lunation":("#496683","#e4e8ed"),"runes":("#7c7288","#e8e3ec"),"elements":("#907a55","#eee7d9"),"tarot":("#486e70","#e3e9e5")}
+
+
+def _wrap_horoscope_sentences(draw,text,font,width):
+    """Keep each short horoscope sentence together, not the next word's head."""
+    sentences=[part.strip() for part in re.split(r"(?<=[。！？])|\n",str(text)) if part.strip()]
+    # All current sentences fit one line at 38px. Retain ordinary width/kinsoku
+    # checks for future longer copy instead of drawing outside the card.
+    return [line for sentence in sentences for line in _wrap_kinsoku(draw,sentence,font,width)]
 
 
 class Canvas:
@@ -19,10 +28,10 @@ class Canvas:
         self.d.line((28,0,28,1920),fill=GOLD,width=4)
         self.d.polygon(((930,0),(1080,0),(1080,114)),fill=wash)
 
-    def text(self,text,box,size=46,bold=False,fill=INK,center=False,leading=1.40):
+    def text(self,text,box,size=46,bold=False,fill=INK,center=False,leading=1.40,wrap_fn=_wrap_kinsoku):
         x,y,r,b=box
         font=ImageFont.truetype(str(FONT_DIR/('ZenMaruGothic-Bold.ttf' if bold else 'ZenMaruGothic-Regular.ttf')),size=size)
-        lines=_wrap_kinsoku(self.d,text,font,r-x)
+        lines=wrap_fn(self.d,text,font,r-x)
         step=round(size*leading)
         if y+(len(lines)-1)*step+size>b:
             raise ValueError(f"Large-type text exceeds box: {text[:35]}")
@@ -37,6 +46,7 @@ class Canvas:
             self.d.text((xx,yy),line,font=font,fill=fill,anchor="lt")
             boxes.append(bbox)
         self.regions.append({"text":text,"size":size,"boxes":boxes})
+        return lines
 
     def header(self,day,title,category=None):
         self.text(day.strftime("%Y.%m.%d"),(85,141,440,184),34,fill="#64766e")
@@ -61,6 +71,8 @@ class Canvas:
         path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
         self.im.save(path,"JPEG",quality=96,subsampling=0)
         content["render_check"]={"overlap_free":True,"text_regions":len(self.regions),"minimum_px":min(r["size"] for r in self.regions),"body_px":46 if content["slot"]=="evening" else 38}
+        if content["slot"]=="noon":
+            content["render_check"]["linebreak_policy"]="one_sentence_per_line_v1"
         return path
 
 
@@ -157,7 +169,7 @@ def render_program(content,day,path):
             x=89+(i%2)*470;y=404+(i//2)*209
             c.d.rounded_rectangle((x,y,x+445,y+193),15,fill=colors[item['element']])
             c.text(item['sign'],(x+20,y+17,x+425,y+70),42,True)
-            c.text(item['text'],(x+20,y+80,x+425,y+182),38,leading=1.32)
+            item['rendered_lines']=c.text(item['text'],(x+20,y+80,x+425,y+182),38,leading=1.32,wrap_fn=_wrap_horoscope_sentences)
         c.text(f"月は{content['moon_sign']}｜一般向けの星よみ",(85,1709,1004,1760),34,center=True)
     else:
         accent,wash=PALETTES[content['id']];c=Canvas(accent,wash)
