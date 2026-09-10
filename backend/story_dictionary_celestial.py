@@ -3,11 +3,12 @@ from datetime import date
 from pathlib import Path
 import math
 from PIL import Image
-from .story_horoscope_celestial import Sheet,font,contrast,PALETTES
+from .story_horoscope_celestial import contrast,PALETTES
+from .story_dictionary_ornament import DictionarySheet as Sheet,dictionary_font as font
 from .story_quality import _wrap_kinsoku,TAROT_DIR
 
 START=date(2026,9,10)
-DESIGN='approved_dictionary_celestial_v1'
+DESIGN='approved_dictionary_astrolabe_v2'
 # Extend the shared palette catalog; the horoscope still cycles only A/B.
 PALETTES['C']=dict(top='#dce3da',bottom='#f1f3eb',card='#f6f7f0',rule='#becabd',ink='#303e36',gold='#556d56',muted='#617266',star='#819880',moon='#f8f5e9',glow='#e6eddf')
 PALETTES['D']=dict(top='#e8dada',bottom='#f6eeea',card='#fcf5f0',rule='#d5bebe',ink='#49363d',gold='#825963',muted='#806970',star='#aa808c',moon='#fff3de',glow='#f3e4dd')
@@ -75,7 +76,7 @@ def graphic(s,g):
 def render_dictionary(content,day,path):
     variant=variant_for_day(day);s=Sheet(variant);p=s.p
     for x,y,z in [(95,192,4),(976,190,6),(54,530,3),(1026,840,4),(54,1330,3),(991,1710,5)]:s.star(x,y,z)
-    s.text(day.strftime('%Y.%m.%d')+'  /  17:00',(110,130,970,177),28,'guidance',fill=p['muted'],center=True)
+    s.text(day.strftime('%Y.%m.%d')+'  /  17:00',(110,180,970,212),24,'guidance',fill=p['muted'],center=True)
     s.text('おますの',(90,224,990,285),46,'serif',fill=p['gold'],center=True)
     s.text('占い大辞典',(90,307,990,410),86,'serif',center=True)
     s.d.line((150,444,930,444),fill=p['rule'],width=2)
@@ -94,12 +95,12 @@ def render_dictionary(content,day,path):
     s.text('@omasu_horoscope',(100,1840,980,1885),28,'guidance',fill=p['muted'],center=True)
     for i,a in enumerate(s.boxes):
         x=a['bbox']
-        if s.decor_mask.crop((math.floor(x[0])-3,math.floor(x[1])-3,math.ceil(x[2])+3,math.ceil(x[3])+3)).getbbox():raise ValueError('Decoration overlaps text')
+        if s.decor_mask.crop((math.floor(x[0])-3,math.floor(x[1])-3,math.ceil(x[2])+3,math.ceil(x[3])+3)).getbbox():raise ValueError('Decoration overlaps text: '+a['text'])
         for b in s.boxes[i+1:]:
             y=b['bbox']
             if x[0]<y[2] and x[2]>y[0] and x[1]<y[3] and x[3]>y[1]:raise ValueError('Text overlap')
     if contrast(p['ink'],p['card'])<7:raise ValueError('Low contrast')
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True);s.im.save(path,'JPEG',quality=96,subsampling=0)
     content['design_variant']='dictionary_celestial_'+variant
-    content['render_check']=dict(design=DESIGN,variant=variant,rotation='daily_four_colors',overlap_free=True,decoration_overlap_free=True,body_px=38,note_px=36,minimum_px=28,body_font='Noto Sans JP',title_font='Noto Serif JP',text_regions=len(s.boxes))
+    content['render_check']=dict(design=DESIGN,variant=variant,rotation='daily_four_colors',overlap_free=True,decoration_overlap_free=True,body_px=38,note_px=36,minimum_px=28,body_font='Noto Sans JP',title_font='Kaisei Tokumin Medium',text_regions=len(s.boxes))
     return path
