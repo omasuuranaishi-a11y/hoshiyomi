@@ -161,6 +161,9 @@ def _graphic(c,g):
 
 
 def render_program(content,day,path):
+    if content['slot']=='evening':
+        from .story_dictionary_celestial import START,render_dictionary
+        if day>=START:return render_dictionary(content,day,path)
     if content["slot"]=="noon":
         from .story_horoscope_celestial import START,render_celestial_horoscope
         if day>=START:
