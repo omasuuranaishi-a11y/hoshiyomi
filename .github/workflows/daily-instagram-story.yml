@@ -10,9 +10,9 @@ on:
     - cron: "43 17 * * *"  # 02:43 JST -> morning primary waits for 05:00
     - cron: "31 18 * * *"  # 03:31 JST -> second morning chance
     - cron: "19 19 * * *"  # 04:19 JST -> third morning chance
-    - cron: "55 22 * * *"  # 07:55 JST -> 12 signs primary at 08:00
-    - cron: "10 23 * * *"  # 08:10 JST -> 12 signs backup
-    - cron: "25 23 * * *"  # 08:25 JST -> 12 signs watchdog
+    - cron: "55 21 * * *"  # 06:55 JST -> 12 signs primary at 07:00
+    - cron: "10 22 * * *"  # 07:10 JST -> 12 signs backup
+    - cron: "25 22 * * *"  # 07:25 JST -> 12 signs watchdog
     - cron: "55 1 * * *"   # 10:55 JST -> column primary at 11:00
     - cron: "10 2 * * *"   # 11:10 JST -> column backup
     - cron: "25 2 * * *"   # 11:25 JST -> column watchdog
@@ -76,7 +76,7 @@ jobs:
         run: |
           case "${SCHEDULE}" in
             "43 17 * * *"|"31 18 * * *"|"19 19 * * *"|"55 19 * * *"|"10 20 * * *"|"25 20 * * *"|"41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
-            "55 22 * * *"|"10 23 * * *"|"25 23 * * *") SLOT="noon"; PUBLISH_AT="08:00" ;;
+            "55 21 * * *"|"10 22 * * *"|"25 22 * * *") SLOT="noon"; PUBLISH_AT="07:00" ;;
             "55 1 * * *"|"10 2 * * *"|"25 2 * * *"|"41 1 * * *") SLOT="night"; PUBLISH_AT="11:00" ;;
             "55 7 * * *"|"10 8 * * *"|"25 8 * * *"|"41 7 * * *") SLOT="evening"; PUBLISH_AT="17:00" ;;
             *) SLOT="${MANUAL_SLOT:-morning}" ;;
@@ -85,7 +85,7 @@ jobs:
           if [ "${SLOT}" = "horoscope" ]; then SLOT="noon"; fi
           case "${SLOT}" in
             morning) PUBLISH_AT="05:00" ;;
-            noon) PUBLISH_AT="08:00" ;;
+            noon) PUBLISH_AT="07:00" ;;
             night) PUBLISH_AT="11:00" ;;
             evening) PUBLISH_AT="17:00" ;;
             *) echo "Unknown slot"; exit 1 ;;
@@ -97,7 +97,7 @@ jobs:
             exit 0
           fi
           if [ "${SLOT}" = "noon" ] && [ "${TARGET_DATE}" \< "2026-09-08" ]; then
-            echo "The new 08:00 program starts September 8; no backfill."
+            echo "The twelve-sign program starts September 8; no backfill."
             exit 1
           fi
           PUBLISH_EPOCH=0

@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 START = date(2026, 9, 7)
-VERSION = "2026-09-08-four-programs-v4-celestial"
+VERSION = "2026-09-10-four-programs-v5-seven-am"
 COLUMNS = json.loads((ROOT / "story_columns.json").read_text(encoding="utf-8"))
 DICTIONARY = json.loads((ROOT / "story_dictionary.json").read_text(encoding="utf-8"))
 SIGN_NAMES = ("牡羊座","牡牛座","双子座","蟹座","獅子座","乙女座","天秤座","蠍座","射手座","山羊座","水瓶座","魚座")
@@ -48,7 +48,7 @@ def _horoscope(facts, day):
     return dict(slot="noon",content_kind="horoscope_20260907",title="12星座 きょうの運勢",items=items,
                 moon_sign=facts["moon"]["sign"],scene_key="daily_twelve_signs",copy_version=VERSION,
                 method="太陽星座を第1の領域とするサイン単位の一般向け解釈。出生時刻による個人ハウスではない。",
-                source_positions=facts["positions"],source_aspects=aspects,reading_hour_jst=8)
+                source_positions=facts["positions"],source_aspects=aspects,reading_hour_jst=7)
 
 
 def build_program_content(facts, slot):
