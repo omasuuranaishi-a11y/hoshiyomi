@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 START = date(2026, 9, 7)
-VERSION = "2026-09-10-four-programs-v7-astrolabe"
+VERSION = "2026-09-13-almanac-v1"
 COLUMNS = json.loads((ROOT / "story_columns.json").read_text(encoding="utf-8"))
 DICTIONARY = json.loads((ROOT / "story_dictionary.json").read_text(encoding="utf-8"))
 SIGN_NAMES = ("牡羊座","牡牛座","双子座","蟹座","獅子座","乙女座","天秤座","蠍座","射手座","山羊座","水瓶座","魚座")
@@ -65,7 +65,13 @@ def build_program_content(facts, slot):
         else:sky=f"月は{moon['sign']}。";relation="今の関心と暮らしの場面を重ねて、今日の取り組み方を考えます。"
         sign_lens=("まず小さく始める","心地よい感覚を確かめる","知りたいことを言葉にする","親しい人や居場所を大切にする","好きなことを表現する","使いやすさを工夫する","相手と希望をすり合わせる","一つのことを深く味わう","新しい見方に触れる","続けられる形を考える","違う方法を試す","心に浮かんだものを受けとめる")[SIGN_NAMES.index(moon['sign'])]
         actions=("食事の相談なら、自分が食べたいものを一つ伝えてから、相手の希望を聞く。最初の材料があると、二人で考えやすくなります。","外出するなら、楽しみたいことと帰る時刻を先に決める。その間に余白を残すと、途中の発見も選べます。","道具を選ぶなら、使う場面を一つ思い浮かべる。誰が、どこで使うかが具体的になるほど、選ぶ条件が見えてきます。","気になる話を聞いたら、知っていることと確かめたいことを分けてメモする。次に調べる場所が一つ見つかります。","何かを頼むなら、してほしいことと希望の時刻を一緒に伝える。相手が返事を考えやすい形に整えてみます。","好きだった場所を思い出し、何が心地よかったかを一つ言葉にする。その条件が、次の楽しみを選ぶ手がかりになります。","新しいことを試すなら、最初は道具や時間を一つ決める。実際にやってみた感触から、次の工夫を考えます。")
-        return dict(slot=slot,content_kind="calendar_20260907",title="きょうの暦と月",term=term,season_note=SEASON_NOTES[term],phase=phase['name'],illumination=phase['illumination_percent'],moon_line=f"月は{ing['from']}から、{ing['local_time']}ごろ{ing['to']}へ。" if ing else f"月は一日を通して{moon['sign']}にいます。",hint=sky+relation+f"月が{moon['sign']}の今日は、{sign_lens}ことにも目を向けて。",thinking=actions[(day-START).days%len(actions)],scene_key=f"calendar_{(day-START).days%len(actions)}",copy_version=VERSION)
+        return dict(slot=slot,content_kind="almanac_20260914",title="今日の月と星",term=term,
+                    season_note=SEASON_NOTES[term],phase=phase['name'],illumination=phase['illumination_percent'],
+                    moon_sign=moon['sign'],moon_degree=moon.get('degree_in_sign',0.0),moon_line=f"月は{ing['from']}から、{ing['local_time']}ごろ{ing['to']}へ。" if ing else f"月は一日を通して{moon['sign']}にいます。",
+                    aspect=aspect,relation=relation,sign_lens=sign_lens,
+                    hint=sky+relation+f"月が{moon['sign']}の今日は、{sign_lens}ことにも目を向けて。",
+                    thinking=actions[(day-START).days%len(actions)],side_mode=(day-START).days%3,
+                    scene_key=f"almanac_{(day-START).days%21}",copy_version=VERSION)
     if slot == "noon" and day > START:
         return _horoscope(facts, day)
     if slot == "evening":

@@ -926,6 +926,9 @@ def _night(d,c,day,fp):
     for p in c["paragraphs"]:y=_text(d,(92,y),p,_font(fp,31),width=895,gap=12)+28
     top=min(y+12,1640);d.rounded_rectangle((80,top,1000,min(top+130,1770)),8,outline=NAVY,width=2);f=_font(fp,34);d.text(((WIDTH-d.textlength(c["ending"],font=f))/2,min(y+48,1675)),c["ending"],font=f,fill=NAVY);_footer(d,fp)
 def render_slot_story(content,day,output_path):
+    if content.get("content_kind")=="almanac_20260914":
+        from .story_almanac import render_almanac
+        return render_almanac(content,day,output_path)
     if content.get("content_kind") in {"dictionary_20260907","horoscope_20260907"}:
         from .story_program_render import render_program
         return render_program(content,day,output_path)
