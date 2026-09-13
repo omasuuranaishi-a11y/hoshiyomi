@@ -7,10 +7,13 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageFilter
 FONT_ROOT=Path(__file__).resolve().parent/"assets"/"fonts"
 GLYPHS="♈♉♊♋♌♍♎♏♐♑♒♓"
 START=date(2026,9,9)
-DESIGN_VERSION="approved_twelve_signs_celestial_v5"
+DESIGN_VERSION="approved_twelve_signs_celestial_v6-five-palettes"
 PALETTES={
  'A':dict(top='#0c172b',bottom='#24324b',card='#18273f',rule='#425169',ink='#f2f3f6',gold='#dbbf8e',muted='#b3becf',star='#d7c19d',moon='#e1c695',glow='#385979'),
  'B':dict(top='#d8d8ea',bottom='#f0eef7',card='#faf9fc',rule='#d3cfdf',ink='#313a50',gold='#746084',muted='#646d83',star='#897697',moon='#fbf7ec',glow='#ece6f5'),
+ 'HC':dict(top='#203a38',bottom='#71877d',card='#294a47',rule='#67817a',ink='#f6f3ea',gold='#e7c99a',muted='#d2ddd6',star='#ead8ad',moon='#f0d8aa',glow='#79a59a'),
+ 'HD':dict(top='#5b394c',bottom='#b1848e',card='#694557',rule='#9a7180',ink='#fff7f4',gold='#efcea3',muted='#ead7dc',star='#f2d4af',moon='#f4d6a7',glow='#c58d9d'),
+ 'HE':dict(top='#193b53',bottom='#7895a5',card='#234b62',rule='#618297',ink='#f5f7f7',gold='#e4c892',muted='#d4e0e5',star='#ead8ad',moon='#efd6a5',glow='#75a8bd'),
 }
 
 
@@ -31,8 +34,8 @@ def font(kind,size):
 
 
 def variant_for_day(day):
-    """Approved daily A/B cycle, stable across month boundaries and re-renders."""
-    return ('A','B')[(day-START).days%2]
+    """Approved five-palette cycle, stable across month boundaries and re-renders."""
+    return ('A','B','HC','HD','HE')[(day-START).days%5]
 
 
 def luminance(color):
@@ -132,9 +135,10 @@ class Sheet:
         assert contrast(p['gold'],p['card'])>=4.5
         path=Path(path);path.parent.mkdir(parents=True,exist_ok=True)
         self.im.save(path,"JPEG",quality=96,subsampling=0)
-        content["design_variant"]="celestial_"+("midnight" if self.variant=="A" else "moonrise")
+        names={'A':'midnight','B':'moonrise','HC':'smoky_green','HD':'dusty_rose','HE':'blue_mist'}
+        content["design_variant"]="celestial_"+names[self.variant]
         content["render_check"]=dict(
-            design=DESIGN_VERSION,variant=self.variant,rotation="daily_alternating",
+            design=DESIGN_VERSION,variant=self.variant,rotation="daily_five_palettes",
             overlap_free=True,decoration_overlap_free=True,title_centered=True,
             sign_names_centered=True,body_alignment="center",body_px=40,
             body_font="Noto Sans JP",body_weight=400,sign_px=48,

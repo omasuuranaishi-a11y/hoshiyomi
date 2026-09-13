@@ -14,8 +14,12 @@ def content_for(day):
 def test_rotation_is_deterministic_through_month_year_and_leap_boundaries():
     assert variant_for_day(START)=='A'
     assert variant_for_day(START+timedelta(days=1))=='B'
+    assert variant_for_day(START+timedelta(days=2))=='HC'
+    assert variant_for_day(START+timedelta(days=3))=='HD'
+    assert variant_for_day(START+timedelta(days=4))=='HE'
     days=[START+timedelta(days=i) for i in range(1100)]
     assert all(variant_for_day(a)!=variant_for_day(b) for a,b in zip(days,days[1:]))
+    assert all(variant_for_day(d)==variant_for_day(d+timedelta(days=5)) for d in days)
     assert all(variant_for_day(d)==variant_for_day(date.fromisoformat(str(d))) for d in days)
 
 
@@ -30,7 +34,7 @@ def test_all_current_copy_fits_at_40px_and_all_zodiac_symbols_exist():
     assert bytes(symbols.getmask('\uffff')) not in masks
 
 
-@pytest.mark.parametrize('variant',('A','B'))
+@pytest.mark.parametrize('variant',('A','B','HC','HD','HE'))
 @pytest.mark.parametrize('mode',range(3))
 def test_both_palettes_center_names_without_symbols_and_preserve_complete_sentences(tmp_path,variant,mode):
     content=content_for(START)
@@ -62,7 +66,7 @@ def test_activation_date_and_repeat_renders(tmp_path):
     old=content_for(date(2026,9,8))
     render_program(old,date(2026,9,8),tmp_path/'before.jpg')
     assert old['render_check']['body_px']==38
-    for offset,expected in ((0,'A'),(1,'B')):
+    for offset,expected in enumerate(('A','B','HC','HD','HE')):
         day=START+timedelta(days=offset)
         first,second=content_for(day),content_for(day)
         one=render_program(first,day,tmp_path/f'{offset}-one.jpg')
