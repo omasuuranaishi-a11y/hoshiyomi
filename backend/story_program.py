@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 START = date(2026, 9, 7)
-VERSION = "2026-09-20-almanac-v3"
+VERSION = "2026-09-20-almanac-v4"
 COLUMNS = json.loads((ROOT / "story_columns.json").read_text(encoding="utf-8"))
 DICTIONARY = json.loads((ROOT / "story_dictionary.json").read_text(encoding="utf-8"))
 SIGN_NAMES = ("牡羊座","牡牛座","双子座","蟹座","獅子座","乙女座","天秤座","蠍座","射手座","山羊座","水瓶座","魚座")
@@ -70,7 +70,7 @@ def build_program_content(facts, slot):
                     moon_sign=moon['sign'],moon_degree=moon.get('degree_in_sign',0.0),moon_line=f"月は{ing['from']}から、{ing['local_time']}ごろ{ing['to']}へ。" if ing else f"月は一日を通して{moon['sign']}にいます。",
                     aspect=aspect,relation=relation,sign_lens=sign_lens,
                     hint=sky+relation+f"月が{moon['sign']}の今日は、{sign_lens}ことにも目を向けて。",
-                    thinking=actions[(day-START).days%len(actions)],side_mode=(day-START).days%3,
+                    thinking=actions[(day-START).days%len(actions)],side_mode=0,
                     scene_key=f"almanac_{(day-START).days%21}",copy_version=VERSION)
     if slot == "noon" and day > START:
         return _horoscope(facts, day)
