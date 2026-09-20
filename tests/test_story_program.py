@@ -22,10 +22,14 @@ def test_dictionary_two_distinct_rounds_include_numerology_and_runes():
     assert len(DICTIONARY["cycle"])==7
     assert {"numerology","runes"} <= set(DICTIONARY["cycle"])
     assert "palmistry" not in DICTIONARY["cycle"]
-    posts=[build_program_content(sky(START+timedelta(days=i)),"evening") for i in range(14)]
-    assert len({p["headline"] for p in posts})==14
-    assert [p["cycle_index"] for p in posts[:7]]==list(range(7))
-    assert all(p["round_index"]==1 for p in posts[7:])
+    posts=[build_program_content(sky(START+timedelta(days=i)),"evening") for i in range(28)]
+    assert len({p["headline"] for p in posts})==28
+    assert all([p["cycle_index"] for p in posts[start:start+7]]==list(range(7)) for start in range(0,28,7))
+    assert [p["round_index"] for p in posts[::7]]==list(range(4))
+    added=posts[14:]
+    astrology_or_tarot=sum(("占星術" in p["category"] and "ルネーション" not in p["category"]) or "タロット" in p["category"] for p in added)
+    assert astrology_or_tarot==11
+    assert all("手相" not in p["category"] for p in posts)
 
 
 def test_twelve_signs_use_sky_positions_in_zodiac_order():
