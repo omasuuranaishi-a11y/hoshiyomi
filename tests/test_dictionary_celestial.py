@@ -6,7 +6,7 @@ from backend.story_dictionary_celestial import START,DESIGN,variant_for_day
 from backend.story_program_render import render_program,validate_program_asset
 
 @pytest.mark.parametrize('offset,variant',[(0,'C'),(1,'D'),(2,'A'),(3,'B')])
-@pytest.mark.parametrize('index',range(28))
+@pytest.mark.parametrize('index',range(len(DICTIONARY['rounds'])*len(DICTIONARY['cycle'])))
 def test_entire_stock_all_palettes(tmp_path,index,offset,variant):
     content=deepcopy(DICTIONARY['rounds'][index//7][index%7]);original=deepcopy(content)
     content.update(slot='evening',title='おますの占い大辞典')
