@@ -1,7 +1,10 @@
 from datetime import date,timedelta
 import json
 import pytest
-from backend.story_program import START,DICTIONARY,SIGN_NAMES,build_program_content
+from backend.story_program import (
+    START,DICTIONARY,HOROSCOPE_COPY_START,HOROSCOPE_COPY_VERSION,
+    LEGACY_HOUSE_OPENINGS,SIGN_NAMES,VERSION,build_program_content,
+)
 import backend.story_automation_four as automation
 
 
@@ -40,6 +43,19 @@ def test_twelve_signs_use_sky_positions_in_zodiac_order():
     assert post["items"][5]["house"]==1
     assert post["source_positions"]==facts["positions"]
     assert post["reading_hour_jst"]==7
+
+
+def test_daily_life_copy_starts_on_september_30_and_changes_each_day():
+    before=build_program_content(sky(HOROSCOPE_COPY_START-timedelta(days=1)),"noon")
+    first=build_program_content(sky(HOROSCOPE_COPY_START),"noon")
+    second=build_program_content(sky(HOROSCOPE_COPY_START+timedelta(days=1)),"noon")
+    assert before["copy_version"]==VERSION
+    assert before["items"][0]["text"].startswith(LEGACY_HOUSE_OPENINGS[before["items"][0]["house"]-1])
+    assert first["copy_version"]==HOROSCOPE_COPY_VERSION
+    assert first["items"][0]["text"]!=second["items"][0]["text"]
+    assert all(item["text"].count("。")==2 for item in first["items"])
+    five_days=[build_program_content(sky(HOROSCOPE_COPY_START+timedelta(days=i)),"noon")["items"][0]["text"] for i in range(5)]
+    assert len(set(five_days))==5
 
 
 @pytest.mark.parametrize("slot,hour",[("morning",5),("noon",7),("night",11),("evening",17)])

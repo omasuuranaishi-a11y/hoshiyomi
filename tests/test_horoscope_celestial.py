@@ -35,7 +35,7 @@ def test_all_current_copy_fits_at_40px_and_all_zodiac_symbols_exist():
 
 
 @pytest.mark.parametrize('variant',('A','B','HC','HD','HE'))
-@pytest.mark.parametrize('mode',range(3))
+@pytest.mark.parametrize('mode',range(len(HOUSE_ACTIONS[0])))
 def test_both_palettes_center_names_without_symbols_and_preserve_complete_sentences(tmp_path,variant,mode):
     content=content_for(START)
     for i,item in enumerate(content['items']):

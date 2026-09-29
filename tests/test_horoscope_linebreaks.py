@@ -12,7 +12,7 @@ def metrics():
 
 
 @pytest.mark.parametrize("house",range(12))
-@pytest.mark.parametrize("mode",range(3))
+@pytest.mark.parametrize("mode",range(len(HOUSE_ACTIONS[0])))
 def test_all_current_horoscopes_keep_sentences_on_two_complete_lines(metrics,house,mode):
     draw,font=metrics
     expected=[HOUSE_OPENINGS[house],HOUSE_ACTIONS[house][mode]]

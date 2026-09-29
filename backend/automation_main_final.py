@@ -19,8 +19,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @app.get("/api/automation/story-version")
 def story_version():
-    from .story_program import VERSION, START, editorial_stock
+    from .story_program import (
+        HOROSCOPE_COPY_START,
+        HOROSCOPE_COPY_VERSION,
+        START,
+        VERSION,
+        editorial_stock,
+    )
     return {"version": VERSION, "effective_from_jst": START.isoformat(),
+            "horoscope_copy_version": HOROSCOPE_COPY_VERSION,
+            "horoscope_effective_from_jst": HOROSCOPE_COPY_START.isoformat(),
             "editorial_stock": editorial_stock()}
 
 

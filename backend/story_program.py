@@ -6,11 +6,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 START = date(2026, 9, 7)
 VERSION = "2026-09-20-almanac-v4"
+HOROSCOPE_COPY_START = date(2026, 9, 30)
+HOROSCOPE_COPY_VERSION = "2026-09-30-daily-life-v1"
 COLUMNS = json.loads((ROOT / "story_columns.json").read_text(encoding="utf-8"))
 DICTIONARY = json.loads((ROOT / "story_dictionary.json").read_text(encoding="utf-8"))
 SIGN_NAMES = ("牡羊座","牡牛座","双子座","蟹座","獅子座","乙女座","天秤座","蠍座","射手座","山羊座","水瓶座","魚座")
-HOUSE_OPENINGS = ("自分らしさが主役。","手持ちの良さを発見。","会話に新しいヒント。","居場所に心を向けて。","好きなことが入口。","いつもの流れに工夫。","対話で視点が広がる。","信頼を育てる時間。","好奇心が次の扉に。","積み重ねが形になる。","仲間との話に可能性。","静かな時間が充電に。")
-HOUSE_ACTIONS = (
+LEGACY_HOUSE_OPENINGS = ("自分らしさが主役。","手持ちの良さを発見。","会話に新しいヒント。","居場所に心を向けて。","好きなことが入口。","いつもの流れに工夫。","対話で視点が広がる。","信頼を育てる時間。","好奇心が次の扉に。","積み重ねが形になる。","仲間との話に可能性。","静かな時間が充電に。")
+LEGACY_HOUSE_ACTIONS = (
  ("今の好みを装いに。","希望を一つ言葉に。","自分のペースで一歩。"),
  ("得意を役立てて。","心地よい物を選ぼう。","手元の道具を活用。"),
  ("気になることを聞く。","発見をメモに残そう。","短い便りを送ろう。"),
@@ -23,6 +25,30 @@ HOUSE_ACTIONS = (
  ("できたことを共有。","成果を具体的に話す。","次の目標を一つ。"),
  ("やりたいことを話す。","共通の楽しみを探す。","仲間の案を聞こう。"),
  ("浮かぶ考えをメモに。","一人の時間を味わう。","好きな音でひと息。")
+)
+
+# From September 30 onward, each sign gets a short emotional hook followed by
+# one concrete action that fits an ordinary day.  Five actions per house keep
+# the sheet fresh while preserving the approved two-line layout.
+HOUSE_OPENINGS = (
+ "自分の本音を優先。","買う前に手元を確認。","短い連絡が鍵になる。",
+ "家の空気を整える日。","好きに遠慮は不要。","疲れを見逃さないで。",
+ "察するより言葉で。","抱え込むと重くなる。","いつもの外に答えが。",
+ "頑張りは届いている。","話すと道が見える。","休むのも今日の予定。",
+)
+HOUSE_ACTIONS = (
+ ("服か髪を一つ変えて。","無理なことは断って。","鏡を見て姿勢を正す。","迷うなら好きな方へ。","希望を先に伝えて。"),
+ ("冷蔵庫を見て買う。","財布の中を整理して。","家にある物を使う。","固定費を一つ見直す。","代用品があるか確認。"),
+ ("後回しの返信を一つ。","会いたい人へ一言。","予定を短く共有して。","気になることを検索。","伝言は今日のうちに。"),
+ ("机の上だけ片づける。","玄関を三分整える。","家族と予定を共有。","好きな香りを部屋に。","帰宅後の席を整える。"),
+ ("十分だけ楽しんで。","好きな曲を一曲聴く。","写真を一枚残して。","趣味の続きを少し。","笑えるものを選んで。"),
+ ("予定を一つ減らして。","水分を先にとって。","座る時間を確保して。","面倒な手順を省く。","寝る時刻を決める。"),
+ ("頼みごとは具体的に。","相手の話を最後まで。","返事の期限を伝えて。","結論より希望を共有。","誤解は会話で解く。"),
+ ("頼れる人に話して。","借り物は今日返そう。","家計の共有を確認。","一つだけ人に頼る。","大事な話は急がずに。"),
+ ("気になる記事を一つ。","帰り道を少し変えて。","知らない言葉を引く。","本を五分だけ開いて。","次の休日を考えて。"),
+ ("終えた仕事を共有。","できたことを三つ。","後回しを一つ終える。","今日の成果を言葉に。","明日の準備を一つ。"),
+ ("思いつきを共有。","相談相手を決める。","誘いには素直に返事。","共通の話題を出す。","助けて、と伝えて。"),
+ ("寝る前は予定なし。","通知を一時間切る。","温かい飲み物で一息。","一人時間を確保。","今日は早めに横へ。")
 )
 
 
@@ -40,13 +66,17 @@ def _horoscope(facts, day):
     aspects=facts.get("major_aspects",[])
     primary=aspects[0] if aspects else None
     mode=0 if primary and primary["aspect"] in {"トライン","セクスタイル"} else 1 if primary and primary["aspect"]=="コンジャンクション" else 2
+    openings=HOUSE_OPENINGS if day >= HOROSCOPE_COPY_START else LEGACY_HOUSE_OPENINGS
+    actions=HOUSE_ACTIONS if day >= HOROSCOPE_COPY_START else LEGACY_HOUSE_ACTIONS
+    action_index=(day-HOROSCOPE_COPY_START).days%len(actions[0]) if day >= HOROSCOPE_COPY_START else mode
     items=[]
     for index,sign in enumerate(SIGN_NAMES):
         house=(moon_index-index)%12+1
-        action=HOUSE_ACTIONS[house-1][mode]
-        items.append({"sign":sign,"house":house,"text":HOUSE_OPENINGS[house-1]+action,"element":index%4})
+        action=actions[house-1][action_index]
+        items.append({"sign":sign,"house":house,"text":openings[house-1]+action,"element":index%4})
     return dict(slot="noon",content_kind="horoscope_20260907",title="12星座 きょうの運勢",items=items,
-                moon_sign=facts["moon"]["sign"],scene_key="daily_twelve_signs",copy_version=VERSION,
+                moon_sign=facts["moon"]["sign"],scene_key="daily_twelve_signs",
+                copy_version=HOROSCOPE_COPY_VERSION if day >= HOROSCOPE_COPY_START else VERSION,
                 method="太陽星座を第1の領域とするサイン単位の一般向け解釈。出生時刻による個人ハウスではない。",
                 source_positions=facts["positions"],source_aspects=aspects,reading_hour_jst=7)
 
