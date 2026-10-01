@@ -78,7 +78,7 @@ def _horoscope(facts, day):
                 moon_sign=facts["moon"]["sign"],scene_key="daily_twelve_signs",
                 copy_version=HOROSCOPE_COPY_VERSION if day >= HOROSCOPE_COPY_START else VERSION,
                 method="太陽星座を第1の領域とするサイン単位の一般向け解釈。出生時刻による個人ハウスではない。",
-                source_positions=facts["positions"],source_aspects=aspects,reading_hour_jst=7)
+                source_positions=facts["positions"],source_aspects=aspects,reading_hour_jst=6)
 
 
 def build_program_content(facts, slot):

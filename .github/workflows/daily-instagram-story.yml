@@ -10,9 +10,9 @@ on:
     - cron: "43 17 * * *"  # 02:43 JST -> morning primary waits for 05:00
     - cron: "31 18 * * *"  # 03:31 JST -> second morning chance
     - cron: "19 19 * * *"  # 04:19 JST -> third morning chance
-    - cron: "55 21 * * *"  # 06:55 JST -> 12 signs primary at 07:00
-    - cron: "10 22 * * *"  # 07:10 JST -> 12 signs backup
-    - cron: "25 22 * * *"  # 07:25 JST -> 12 signs watchdog
+    - cron: "55 20 * * *"  # 05:55 JST -> 12 signs primary at 06:00
+    - cron: "10 21 * * *"  # 06:10 JST -> 12 signs backup
+    - cron: "25 21 * * *"  # 06:25 JST -> 12 signs watchdog
     - cron: "55 7 * * *"   # 16:55 JST -> dictionary primary at 17:00
     - cron: "10 8 * * *"   # 17:10 JST -> dictionary backup
     - cron: "25 8 * * *"   # 17:25 JST -> dictionary watchdog
@@ -72,14 +72,14 @@ jobs:
         run: |
           case "${SCHEDULE}" in
             "43 17 * * *"|"31 18 * * *"|"19 19 * * *"|"55 19 * * *"|"10 20 * * *"|"25 20 * * *"|"41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
-            "55 21 * * *"|"10 22 * * *"|"25 22 * * *") SLOT="noon"; PUBLISH_AT="07:00" ;;
+            "55 20 * * *"|"10 21 * * *"|"25 21 * * *") SLOT="noon"; PUBLISH_AT="06:00" ;;
             "55 7 * * *"|"10 8 * * *"|"25 8 * * *"|"41 7 * * *") SLOT="evening"; PUBLISH_AT="17:00" ;;
             *) SLOT="${MANUAL_SLOT:-morning}" ;;
           esac
           if [ "${SLOT}" = "horoscope" ]; then SLOT="noon"; fi
           case "${SLOT}" in
             morning) PUBLISH_AT="05:00" ;;
-            noon) PUBLISH_AT="07:00" ;;
+            noon) PUBLISH_AT="06:00" ;;
             evening) PUBLISH_AT="17:00" ;;
             *) echo "Unknown slot"; exit 1 ;;
           esac

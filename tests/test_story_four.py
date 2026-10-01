@@ -242,16 +242,15 @@ def test_morning_palette_changes_are_obvious_on_a_phone():
         changed=sum(histogram[12:])/(1080*1920)
         assert changed>0.08
 
-def test_workflow_schedules_four_programs_with_three_chances_each():
+def test_workflow_schedules_three_programs_with_three_chances_each():
     workflow=(Path(__file__).parents[1]/".github/workflows/daily-instagram-story.yml").read_text(encoding="utf-8")
-    assert workflow.count('cron:')==12
-    for cron in ('43 17 * * *','31 18 * * *','19 19 * * *','55 22 * * *','10 23 * * *','25 23 * * *','55 1 * * *','10 2 * * *','25 2 * * *','55 7 * * *','10 8 * * *','25 8 * * *'):
+    assert workflow.count('cron:')==9
+    for cron in ('43 17 * * *','31 18 * * *','19 19 * * *','55 20 * * *','10 21 * * *','25 21 * * *','55 7 * * *','10 8 * * *','25 8 * * *'):
         assert cron in workflow
-    for removed in ('58 20 * * *','8 21 * * *','18 21 * * *','30 0 * * *','40 0 * * *','50 0 * * *','30 9 * * *','40 9 * * *','50 9 * * *','11 0 * * *','11 9 * * *'):
+    for removed in ('55 21 * * *','10 22 * * *','25 22 * * *','55 22 * * *','10 23 * * *','25 23 * * *','55 1 * * *','10 2 * * *','25 2 * * *'):
         assert removed not in workflow
     assert 'PUBLISH_AT="05:00"' in workflow
-    assert 'PUBLISH_AT="08:00"' in workflow
-    assert 'PUBLISH_AT="11:00"' in workflow
+    assert 'PUBLISH_AT="06:00"' in workflow
     assert 'PUBLISH_AT="17:00"' in workflow
     assert 'timeout-minutes: 180' in workflow
     assert 'sleep "${FINAL_WAIT}"' in workflow
