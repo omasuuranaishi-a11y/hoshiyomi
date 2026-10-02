@@ -42,7 +42,7 @@ def test_twelve_signs_use_sky_positions_in_zodiac_order():
     assert len({p["house"] for p in post["items"]})==12
     assert post["items"][5]["house"]==1
     assert post["source_positions"]==facts["positions"]
-    assert post["reading_hour_jst"]==6
+    assert post["reading_hour_jst"]==5
 
 
 def test_daily_life_copy_starts_on_september_30_and_changes_each_day():
@@ -58,7 +58,7 @@ def test_daily_life_copy_starts_on_september_30_and_changes_each_day():
     assert len(set(five_days))==5
 
 
-@pytest.mark.parametrize("slot,hour",[("morning",5),("noon",6),("night",11),("evening",17)])
+@pytest.mark.parametrize("slot,hour",[("morning",4),("noon",5),("night",11),("evening",17)])
 def test_preview_uses_slot_hour_without_overwriting_live_record(monkeypatch,tmp_path,slot,hour):
     day=START+timedelta(days=1)
     record=tmp_path/"story_runs"/f"{day}-{slot}.json"

@@ -244,13 +244,14 @@ def test_morning_palette_changes_are_obvious_on_a_phone():
 
 def test_workflow_schedules_three_programs_with_three_chances_each():
     workflow=(Path(__file__).parents[1]/".github/workflows/daily-instagram-story.yml").read_text(encoding="utf-8")
+    schedule_block=workflow.split("workflow_dispatch:",1)[0]
     assert workflow.count('cron:')==9
-    for cron in ('43 17 * * *','31 18 * * *','19 19 * * *','55 20 * * *','10 21 * * *','25 21 * * *','55 7 * * *','10 8 * * *','25 8 * * *'):
-        assert cron in workflow
-    for removed in ('55 21 * * *','10 22 * * *','25 22 * * *','55 22 * * *','10 23 * * *','25 23 * * *','55 1 * * *','10 2 * * *','25 2 * * *'):
-        assert removed not in workflow
+    for cron in ('43 16 * * *','31 17 * * *','19 18 * * *','55 19 * * *','10 20 * * *','25 20 * * *','55 7 * * *','10 8 * * *','25 8 * * *'):
+        assert cron in schedule_block
+    for removed in ('43 17 * * *','31 18 * * *','19 19 * * *','55 20 * * *','10 21 * * *','25 21 * * *'):
+        assert removed not in schedule_block
+    assert 'PUBLISH_AT="04:00"' in workflow
     assert 'PUBLISH_AT="05:00"' in workflow
-    assert 'PUBLISH_AT="06:00"' in workflow
     assert 'PUBLISH_AT="17:00"' in workflow
     assert 'timeout-minutes: 180' in workflow
     assert 'sleep "${FINAL_WAIT}"' in workflow

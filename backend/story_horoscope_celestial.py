@@ -97,7 +97,7 @@ class Sheet:
     def render(self,content,day,path):
         p=self.p;self.decorate()
         self.text(day.strftime('%Y.%m.%d')+'  '+('MON','TUE','WED','THU','FRI','SAT','SUN')[day.weekday()],(70,148,575,191),32,fill=p['muted'])
-        self.text('06:00',(702,148,957,191),28,fill=p['muted'])
+        self.text('05:00',(702,148,957,191),28,fill=p['muted'])
         self.text('12星座',(70,227,1010,334),94,'serif',fill=p['gold'],center=True)
         self.text('きょうの運勢',(70,345,1010,430),66,'serif',center=True)
         self.d.line((71,458,1009,458),fill=p['rule'],width=2)

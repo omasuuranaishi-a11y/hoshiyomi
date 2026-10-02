@@ -2,17 +2,17 @@ name: Three Daily Instagram Stories
 
 on:
   schedule:
-    # Start the three morning chances well before 05:00 JST. GitHub scheduled
+    # Start the three morning chances well before 04:00 JST. GitHub scheduled
     # events can be delayed or dropped, so each chance has enough lead time to
-    # wait for 05:00 instead of depending on a just-in-time scheduler wake-up.
+    # wait for 04:00 instead of depending on a just-in-time scheduler wake-up.
     # A persistent GitHub cache marker plus the API record prevents duplicate
     # Instagram stories even when Render restarts and loses its local record.
-    - cron: "43 17 * * *"  # 02:43 JST -> morning primary waits for 05:00
-    - cron: "31 18 * * *"  # 03:31 JST -> second morning chance
-    - cron: "19 19 * * *"  # 04:19 JST -> third morning chance
-    - cron: "55 20 * * *"  # 05:55 JST -> 12 signs primary at 06:00
-    - cron: "10 21 * * *"  # 06:10 JST -> 12 signs backup
-    - cron: "25 21 * * *"  # 06:25 JST -> 12 signs watchdog
+    - cron: "43 16 * * *"  # 01:43 JST -> morning primary waits for 04:00
+    - cron: "31 17 * * *"  # 02:31 JST -> second morning chance
+    - cron: "19 18 * * *"  # 03:19 JST -> third morning chance
+    - cron: "55 19 * * *"  # 04:55 JST -> 12 signs primary at 05:00
+    - cron: "10 20 * * *"  # 05:10 JST -> 12 signs backup
+    - cron: "25 20 * * *"  # 05:25 JST -> 12 signs watchdog
     - cron: "55 7 * * *"   # 16:55 JST -> dictionary primary at 17:00
     - cron: "10 8 * * *"   # 17:10 JST -> dictionary backup
     - cron: "25 8 * * *"   # 17:25 JST -> dictionary watchdog
@@ -71,15 +71,15 @@ jobs:
           WAIT_UNTIL_SLOT: ${{ inputs.wait_until_slot }}
         run: |
           case "${SCHEDULE}" in
-            "43 17 * * *"|"31 18 * * *"|"19 19 * * *"|"55 19 * * *"|"10 20 * * *"|"25 20 * * *"|"41 19 * * *") SLOT="morning"; PUBLISH_AT="05:00" ;;
-            "55 20 * * *"|"10 21 * * *"|"25 21 * * *") SLOT="noon"; PUBLISH_AT="06:00" ;;
+            "43 16 * * *"|"31 17 * * *"|"19 18 * * *"|"43 17 * * *"|"31 18 * * *"|"19 19 * * *") SLOT="morning"; PUBLISH_AT="04:00" ;;
+            "55 19 * * *"|"10 20 * * *"|"25 20 * * *"|"55 20 * * *"|"10 21 * * *"|"25 21 * * *") SLOT="noon"; PUBLISH_AT="05:00" ;;
             "55 7 * * *"|"10 8 * * *"|"25 8 * * *"|"41 7 * * *") SLOT="evening"; PUBLISH_AT="17:00" ;;
             *) SLOT="${MANUAL_SLOT:-morning}" ;;
           esac
           if [ "${SLOT}" = "horoscope" ]; then SLOT="noon"; fi
           case "${SLOT}" in
-            morning) PUBLISH_AT="05:00" ;;
-            noon) PUBLISH_AT="06:00" ;;
+            morning) PUBLISH_AT="04:00" ;;
+            noon) PUBLISH_AT="05:00" ;;
             evening) PUBLISH_AT="17:00" ;;
             *) echo "Unknown slot"; exit 1 ;;
           esac
@@ -98,7 +98,7 @@ jobs:
             TARGET_EPOCH="$(TZ=Asia/Tokyo date -d "${TODAY_JST} ${PUBLISH_AT}:00" +%s)"
             NOW_EPOCH="$(date +%s)"
             WAIT_SECONDS="$((TARGET_EPOCH - NOW_EPOCH))"
-            # The earliest morning trigger is 137 minutes before 05:00. A
+            # The earliest morning trigger is 137 minutes before 04:00. A
             # wait longer than three hours means this is a heavily delayed
             # event from the previous JST date, so recover yesterday instead.
             MAX_EARLY_SECONDS=10800
