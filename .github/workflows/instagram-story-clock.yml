@@ -1,0 +1,43 @@
+name: Instagram Story Clock
+run-name: Story clock - ${{ inputs.mode || 'live' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        default: live
+        options:
+          - live
+          - verify
+          - handoff-check
+  schedule:
+    # Bootstrap only. A healthy live clock starts its successor directly.
+    - cron: "37 */2 * * *"
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: instagram-story-clock-${{ inputs.mode || 'live' }}
+  cancel-in-progress: false
+
+jobs:
+  clock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Keep publisher ready, or verify without posting
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOCK_MODE: ${{ inputs.mode || 'live' }}
+        run: python scripts/instagram_story_clock.py "${CLOCK_MODE}"
+      - name: Hand off to next live clock before the 180-minute limit
+        if: success() && (inputs.mode == 'live' || github.event_name == 'schedule')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/instagram_story_clock.py handoff

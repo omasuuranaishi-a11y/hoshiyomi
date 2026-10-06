@@ -1,4 +1,5 @@
 name: Three Daily Instagram Stories
+run-name: ${{ inputs.clock_request_id && format('clock-{0}', inputs.clock_request_id) || 'Three Daily Instagram Stories' }}
 
 on:
   schedule:
@@ -51,6 +52,10 @@ on:
         required: false
         default: false
         type: boolean
+      clock_request_id:
+        description: Internal clock id for duplicate dispatch detection
+        required: false
+        type: string
 
 concurrency:
   group: daily-instagram-story
@@ -100,11 +105,11 @@ jobs:
             WAIT_SECONDS="$((TARGET_EPOCH - NOW_EPOCH))"
             # The earliest morning trigger is 137 minutes before 04:00. A
             # wait longer than three hours means this is a heavily delayed
-            # event from the previous JST date, so recover yesterday instead.
+            # event from the previous JST date. Never backfill that date.
             MAX_EARLY_SECONDS=10800
             if [ "${WAIT_SECONDS}" -gt "${MAX_EARLY_SECONDS}" ]; then
-              TARGET_DATE="$(TZ=Asia/Tokyo date -d yesterday +%F)"
-              echo "Delayed ${SLOT} event; publishing ${TARGET_DATE} immediately."
+              echo "Discarding stale ${SLOT} event; no past-date backfill."
+              exit 0
             elif [ "${WAIT_SECONDS}" -gt 0 ]; then
               TARGET_DATE="${TODAY_JST}"
               PUBLISH_EPOCH="${TARGET_EPOCH}"
@@ -127,6 +132,7 @@ jobs:
 
       - name: Restore persistent published marker
         id: published-marker
+        if: steps.resolve.outputs.target_date != ''
         uses: actions/cache/restore@v6
         with:
           path: .story-published/${{ steps.resolve.outputs.target_date }}-${{ steps.resolve.outputs.slot }}.done
@@ -134,7 +140,7 @@ jobs:
 
       - name: Generate and publish one story
         id: publish-story
-        if: inputs.mark_published_only == true || inputs.force_repost == true || inputs.dry_run == true || steps.published-marker.outputs.cache-hit != 'true'
+        if: steps.resolve.outputs.target_date != '' && (inputs.mark_published_only == true || inputs.force_repost == true || inputs.dry_run == true || steps.published-marker.outputs.cache-hit != 'true')
         env:
           AUTOMATION_URL: ${{ secrets.AUTOMATION_URL }}
           AUTOMATION_SECRET: ${{ secrets.AUTOMATION_SECRET }}
