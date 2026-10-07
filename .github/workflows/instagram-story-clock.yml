@@ -1,6 +1,9 @@
 name: Instagram Story Clock
 run-name: Story clock - ${{ inputs.mode || 'live' }}
 
+env:
+  TZ: Asia/Tokyo
+
 on:
   workflow_dispatch:
     inputs:

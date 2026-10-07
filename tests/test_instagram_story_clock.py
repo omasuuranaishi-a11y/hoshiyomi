@@ -1,6 +1,8 @@
 from datetime import date, datetime, timedelta, timezone
+from io import BytesIO
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError, URLError
 from scripts import instagram_story_clock as clock
 
 
@@ -18,6 +20,51 @@ class ClockTests(unittest.TestCase):
         self.assertEqual(slots[0][1], "horoscope")
         self.assertEqual(slots[0][2], datetime(2026, 10, 7, 5, tzinfo=clock.JST))
         self.assertTrue(all(due > now for _, _, due in slots))
+
+    def test_naive_time_cannot_use_the_runner_timezone(self):
+        with self.assertRaises(ValueError):
+            list(clock.upcoming_slots(datetime(2026, 10, 7, 3), date(2026, 10, 7)))
+
+    def request_api(self):
+        api = object.__new__(clock.GitHub)
+        api.repo = "example/repository"
+        api.token = "test-token"
+        api.base = "https://api.github.com"
+        return api
+
+    def test_read_recovers_from_transient_http_error(self):
+        error = HTTPError("https://api.github.com/test", 503, "temporary", None, None)
+        with patch.object(clock, "urlopen", side_effect=[error, BytesIO(b'{"ok":true}')]) as read, \
+             patch.object(clock.time, "sleep") as sleep:
+            self.assertEqual(self.request_api().request("actions/caches"), {"ok": True})
+        self.assertEqual(read.call_count, 2)
+        self.assertTrue(all(call.args[0].method == "GET" for call in read.call_args_list))
+        sleep.assert_called_once_with(2)
+
+    def test_read_transport_failure_is_bounded(self):
+        with patch.object(clock, "urlopen", side_effect=URLError("temporary")) as read, \
+             patch.object(clock.time, "sleep"):
+            with self.assertRaises(clock.GitHubReadUnavailable):
+                self.request_api().request("actions/caches")
+        self.assertEqual(read.call_count, 3)
+
+    def test_authorization_error_is_not_hidden_or_retried(self):
+        error = HTTPError("https://api.github.com/test", 403, "forbidden", None, None)
+        with patch.object(clock, "urlopen", side_effect=error) as read, \
+             patch.object(clock.time, "sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, "HTTP 403"):
+                self.request_api().request("actions/caches")
+        self.assertEqual(read.call_count, 1)
+        sleep.assert_not_called()
+
+    def test_dispatch_post_never_retries_transient_http_error(self):
+        error = HTTPError("https://api.github.com/test", 503, "temporary", None, None)
+        with patch.object(clock, "urlopen", side_effect=error) as dispatch, \
+             patch.object(clock.time, "sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, "POST.*503"):
+                self.request_api().dispatch(clock.PUBLISHER, {"dry_run": "true"})
+        self.assertEqual(dispatch.call_count, 1)
+        sleep.assert_not_called()
 
     def api(self, *, published=False, runs=(), dispatch_error=None):
         api = object.__new__(clock.GitHub)
@@ -84,6 +131,31 @@ class ClockTests(unittest.TestCase):
             def now(cls, tz=None):
                 return origin + timedelta(seconds=ticks[0])
         api = self.api()
+        def sleep(seconds):
+            ticks[0] += seconds
+        with patch.object(clock, "datetime", FakeDatetime), \
+             patch.object(clock.time, "monotonic", lambda: ticks[0]), \
+             patch.object(clock.time, "sleep", sleep):
+            clock.run_clock(api, date(2026, 10, 7), 1)
+        self.assertEqual(len(api.calls), 1)
+        self.assertEqual(api.calls[0][1]["slot"], "morning")
+
+    def test_failed_read_does_not_stop_clock_or_send_a_post(self):
+        origin = datetime(2026, 10, 7, 3, 45, tzinfo=clock.JST)
+        ticks = [0.0]
+        class FakeDatetime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return origin + timedelta(seconds=ticks[0])
+        api = self.api()
+        failed = [False]
+        def published(*args):
+            if not failed[0]:
+                failed[0] = True
+                self.assertEqual(api.calls, [])
+                raise clock.GitHubReadUnavailable("temporary read failure")
+            return False
+        api.published = published
         def sleep(seconds):
             ticks[0] += seconds
         with patch.object(clock, "datetime", FakeDatetime), \

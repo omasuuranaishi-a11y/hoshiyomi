@@ -1,6 +1,9 @@
 name: Three Daily Instagram Stories
 run-name: ${{ inputs.clock_request_id && format('clock-{0}', inputs.clock_request_id) || 'Three Daily Instagram Stories' }}
 
+env:
+  TZ: Asia/Tokyo
+
 on:
   schedule:
     # Start the three morning chances well before 04:00 JST. GitHub scheduled
@@ -155,8 +158,8 @@ jobs:
           if [ "${MARK_PUBLISHED_ONLY}" != "true" ]; then
             if [ "${DRY_RUN}" != "true" ] && [ "${PUBLISH_EPOCH:-0}" -gt 0 ]; then
               # Wake the free Render service four minutes early, then publish
-              # at the target epoch. The health check is read-only and safe to
-              # retry; the Instagram POST below is intentionally never retried.
+              # at the target epoch. Only readiness GETs and preview-only POSTs
+              # are retried. A publishing POST is always sent at most once.
               WARMUP_EPOCH="$((PUBLISH_EPOCH - 240))"
               NOW_EPOCH="$(date +%s)"
               WARMUP_WAIT="$((WARMUP_EPOCH - NOW_EPOCH))"
@@ -164,11 +167,19 @@ jobs:
                 echo "Waiting ${WARMUP_WAIT}s before warming Render."
                 sleep "${WARMUP_WAIT}"
               fi
-              HEALTHCHECK_URL="${AUTOMATION_URL%%/api/*}/healthz"
-              echo "Warming Render with ${HEALTHCHECK_URL}."
-              curl --fail --show-error --silent --max-time 120 \
-                --retry 3 --retry-delay 5 \
-                "${HEALTHCHECK_URL}" > /dev/null || echo "Warm-up failed; publish will still be attempted."
+            fi
+            # Also warm previews and immediate recoveries. If readiness cannot
+            # be confirmed, fail before any publishing POST, leaving a clear
+            # pre-publication failure rather than an unknown publish result.
+            HEALTHCHECK_URL="${AUTOMATION_URL%%/api/*}/healthz"
+            echo "Checking Render readiness at $(date --iso-8601=seconds) JST."
+            if ! curl --fail --show-error --silent --max-time 60 \
+              --retry 2 --retry-delay 5 --retry-max-time 120 \
+              --output /dev/null "${HEALTHCHECK_URL}"; then
+              echo "::error::Render readiness failed; no publish request was sent."
+              exit 1
+            fi
+            if [ "${DRY_RUN}" != "true" ] && [ "${PUBLISH_EPOCH:-0}" -gt 0 ]; then
               NOW_EPOCH="$(date +%s)"
               FINAL_WAIT="$((PUBLISH_EPOCH - NOW_EPOCH))"
               if [ "${FINAL_WAIT}" -gt 0 ]; then
@@ -183,10 +194,19 @@ jobs:
             fi
             SEPARATOR="?"
             case "${AUTOMATION_URL}" in *\?*) SEPARATOR="&" ;; esac
-            curl --fail-with-body --show-error --silent --max-time 180 \
+            RETRY_OPTIONS=()
+            REQUEST_TIMEOUT=180
+            if [ "${DRY_RUN}" = "true" ]; then
+              RETRY_OPTIONS=(--retry 2 --retry-delay 5 --retry-max-time 120)
+              REQUEST_TIMEOUT=60
+            fi
+            echo "Requesting ${TARGET_DATE}/${SLOT} at $(date --iso-8601=seconds) JST; dry_run=${DRY_RUN:-false}."
+            curl --fail-with-body --show-error --silent --max-time "${REQUEST_TIMEOUT}" \
+              "${RETRY_OPTIONS[@]}" \
               --request POST \
               --header "Authorization: Bearer ${AUTOMATION_SECRET}" \
-              "${AUTOMATION_URL}${SEPARATOR}${QUERY}" > story-response.json
+              --output story-response.json \
+              "${AUTOMATION_URL}${SEPARATOR}${QUERY}"
             cat story-response.json
             python -c 'import json,os; r=json.load(open("story-response.json")); expected="dry_run" if os.getenv("DRY_RUN")=="true" else "published"; assert r.get("status")==expected, "No confirmed publish/preview result"'
           else

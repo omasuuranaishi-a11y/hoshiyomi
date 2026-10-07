@@ -10,7 +10,7 @@ from datetime import date, datetime, time as day_time, timedelta, timezone
 import json
 import os
 import time
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -21,6 +21,12 @@ SLOTS = (("morning", 4), ("horoscope", 5), ("evening", 17))
 LEAD = timedelta(minutes=15)
 MAX_RUNTIME_MINUTES = 170
 ACTIVE = {"queued", "in_progress", "waiting", "pending", "requested"}
+READ_ATTEMPTS = 3
+TRANSIENT_HTTP = {408, 500, 502, 503, 504}
+
+
+class GitHubReadUnavailable(RuntimeError):
+    """A read failed transiently; no posting or dispatch was attempted."""
 
 
 def log(message: str) -> None:
@@ -29,6 +35,8 @@ def log(message: str) -> None:
 
 def upcoming_slots(now: datetime, start_date: date):
     """Only current/future slots; never backfill an elapsed publishing time."""
+    if now.utcoffset() is None:
+        raise ValueError("Clock time must include an explicit timezone")
     local = now.astimezone(JST)
     for offset in range(2):
         target = local.date() + timedelta(days=offset)
@@ -73,13 +81,27 @@ class GitHub:
                 "Content-Type": "application/json",
             },
         )
-        # No retry for any POST. Unknown dispatch outcomes must not be resent.
-        try:
-            with urlopen(req, timeout=30) as response:
-                raw = response.read()
-        except HTTPError as exc:
-            raise RuntimeError(f"GitHub API {req.method} returned HTTP {exc.code}") from None
-        return json.loads(raw) if raw else {}
+        # Retry only reads. Any POST error still propagates immediately, because
+        # a dispatch might have succeeded even when its response was lost.
+        attempts = READ_ATTEMPTS if payload is None else 1
+        for attempt in range(attempts):
+            try:
+                with urlopen(req, timeout=15 if payload is None else 30) as response:
+                    raw = response.read()
+                return json.loads(raw) if raw else {}
+            except HTTPError as exc:
+                if payload is not None or exc.code not in TRANSIENT_HTTP:
+                    raise RuntimeError(
+                        f"GitHub API {req.method} returned HTTP {exc.code}"
+                    ) from None
+                reason = f"HTTP {exc.code}"
+            except (URLError, TimeoutError, ConnectionError, json.JSONDecodeError):
+                if payload is not None:
+                    raise
+                reason = "read connection or response unavailable"
+            if attempt == attempts - 1:
+                raise GitHubReadUnavailable(f"GitHub GET unavailable: {reason}") from None
+            time.sleep(2 ** (attempt + 1))
 
     def dispatch(self, workflow: str, inputs: dict):
         return self.request(f"actions/workflows/{workflow}/dispatches", {
@@ -130,7 +152,12 @@ def run_clock(api: GitHub, start_date: date, runtime_minutes: int):
         for target, slot, due in upcoming_slots(now, start_date):
             ticket = (target, slot)
             if ticket not in handled and due - LEAD <= now < due:
-                if api.prepare_once(target, slot):
+                try:
+                    prepared = api.prepare_once(target, slot)
+                except GitHubReadUnavailable as exc:
+                    log(f"{exc}; clock will recheck, without posting or dispatching")
+                    prepared = False
+                if prepared:
                     handled.add(ticket)
         if time.monotonic() >= next_heartbeat:
             log("Clock healthy; times=04:00,05:00,17:00 JST; no past-slot dispatches")
@@ -150,10 +177,14 @@ def verify(api: GitHub, target: date):
         log(f"Preview requested (never publish): {slot}/{target}")
         # Global publisher concurrency has one pending slot. Wait for each
         # preview before dispatching the next, so none can replace another.
-        deadline = time.monotonic() + 240
+        deadline = time.monotonic() + 480
         while time.monotonic() < deadline:
-            found = next((r for r in api.runs(PUBLISHER, event="workflow_dispatch")
-                          if r.get("display_title") == tickets[-1]), None)
+            try:
+                found = next((r for r in api.runs(PUBLISHER, event="workflow_dispatch")
+                              if r.get("display_title") == tickets[-1]), None)
+            except GitHubReadUnavailable as exc:
+                log(f"{exc}; rechecking the same preview, without another dispatch")
+                found = None
             if found and found["status"] == "completed":
                 if found["conclusion"] != "success":
                     raise RuntimeError(f"Preview failed: {slot}; run={found['id']}")
