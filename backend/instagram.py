@@ -2,14 +2,20 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 import httpx
 
+from .story_delivery import inspect_story_image
+
 
 class InstagramAPIError(RuntimeError):
     pass
+
+
+class InstagramPublishUnknown(InstagramAPIError):
+    """A publishing POST may have completed; never automatically repeat it."""
 
 
 class InstagramPublisher:
@@ -41,6 +47,7 @@ class InstagramPublisher:
             else float(os.getenv("INSTAGRAM_PUBLISH_SETTLE_SECONDS", "5"))
         )
         self.client = client or httpx.Client(timeout=60, follow_redirects=True)
+        self.last_delivery_check: dict[str, Any] = {"passed": False, "reason": "not checked"}
 
         if not self.user_id or not self.access_token:
             raise RuntimeError(
@@ -126,39 +133,66 @@ class InstagramPublisher:
         )
 
     def publish_container(self, container_id: str) -> str:
-        response = self.client.post(
-            self._url(f"{self.user_id}/media_publish"),
-            headers=self._headers,
-            data={"creation_id": container_id},
-        )
+        try:
+            response = self.client.post(
+                self._url(f"{self.user_id}/media_publish"),
+                headers=self._headers,
+                data={"creation_id": container_id},
+            )
+        except httpx.RequestError as exc:
+            raise InstagramPublishUnknown("Instagram publish response was lost; do not resend") from exc
+        if response.status_code >= 500:
+            raise InstagramPublishUnknown("Instagram publish result is unknown; do not resend")
         self._raise_for_error(response)
-        media_id = self._body(response).get("id")
+        try:
+            media_id = self._body(response).get("id")
+        except InstagramAPIError as exc:
+            raise InstagramPublishUnknown("Instagram publish returned an unreadable result; do not resend") from exc
         if not media_id:
-            raise InstagramAPIError("公開後のInstagramメディアIDを取得できませんでした。")
+            raise InstagramPublishUnknown("公開後のInstagramメディアIDを取得できませんでした。再送しないでください。")
         return str(media_id)
 
-    def verify_published(self, media_id: str, *, attempts: int = 5) -> bool:
-        """Best-effort confirmation after Meta returns a published media id."""
+    def verify_published(self, media_id: str, *, attempts: int = 3,
+                         expected_image: bytes | None = None) -> bool:
+        """Read the delivered image without issuing another publishing POST."""
         last_error = "not visible"
         for attempt in range(attempts):
             try:
                 response = self.client.get(
                     self._url(media_id),
                     headers=self._headers,
-                    params={"fields": "id,media_type,timestamp"},
+                    params={"fields": "id,media_type,timestamp,media_url" if expected_image is not None
+                            else "id,media_type,timestamp"},
+                    timeout=8,
                 )
                 self._raise_for_error(response)
                 body = self._body(response)
                 if str(body.get("id")) == str(media_id):
-                    return
+                    report: dict[str, Any] = {"passed": True, "media_id": str(media_id),
+                                              "timestamp": body.get("timestamp")}
+                    if expected_image is not None:
+                        media_url = str(body.get("media_url") or "")
+                        if urlparse(media_url).scheme != "https":
+                            raise InstagramAPIError("Published image URL is not available yet")
+                        # Do not send the Graph access token to the image CDN.
+                        image_response = self.client.get(media_url, timeout=8)
+                        if image_response.status_code != 200:
+                            raise InstagramAPIError(f"Published image HTTP {image_response.status_code}")
+                        report["image"] = inspect_story_image(image_response.content, expected=expected_image)
+                    self.last_delivery_check = report
+                    return True
                 last_error = "media id did not match"
-            except Exception as exc:
-                last_error = str(exc)
+            except httpx.RequestError:
+                last_error = "Published image confirmation connection failed"
+            except (InstagramAPIError, RuntimeError) as exc:
+                last_error = str(exc)[:300]
             if attempt < attempts - 1:
                 time.sleep(2)
+        self.last_delivery_check = {"passed": False, "media_id": str(media_id), "reason": last_error}
         return False
 
-    def publish_story(self, image_url: str) -> str:
+    def publish_story(self, image_url: str, *, expected_image: bytes | None = None,
+                      on_published: Callable[[str], None] | None = None) -> str:
         container_id = self.create_story_container(image_url)
         self.wait_until_ready(container_id)
         # Meta can report FINISHED a few seconds before media_publish can resolve
@@ -167,5 +201,8 @@ class InstagramPublisher:
         if self.publish_settle_seconds > 0:
             time.sleep(self.publish_settle_seconds)
         media_id = self.publish_container(container_id)
-        self.verify_published(media_id)
+        # Persist the returned id before any slower, read-only delivery checks.
+        if on_published is not None:
+            on_published(media_id)
+        self.verify_published(media_id, expected_image=expected_image)
         return media_id

@@ -55,6 +55,10 @@ on:
         required: false
         default: false
         type: boolean
+      verify_media_id:
+        description: In preview mode only, check an existing published image without posting
+        required: false
+        type: string
       clock_request_id:
         description: Internal clock id for duplicate dispatch detection
         required: false
@@ -154,6 +158,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           PUBLISH_EPOCH: ${{ steps.resolve.outputs.publish_epoch }}
           DRY_RUN: ${{ inputs.dry_run }}
+          VERIFY_MEDIA_ID: ${{ inputs.verify_media_id }}
         run: |
           if [ "${MARK_PUBLISHED_ONLY}" != "true" ]; then
             if [ "${DRY_RUN}" != "true" ] && [ "${PUBLISH_EPOCH:-0}" -gt 0 ]; then
@@ -189,16 +194,23 @@ jobs:
             fi
             QUERY="slot=${SLOT}&target_date=${TARGET_DATE}"
             if [ "${DRY_RUN}" = "true" ]; then QUERY="${QUERY}&dry_run=true"; fi
+            if [ -n "${VERIFY_MEDIA_ID:-}" ]; then
+              if [ "${DRY_RUN}" != "true" ] || ! [[ "${VERIFY_MEDIA_ID}" =~ ^[0-9]{5,30}$ ]]; then
+                echo "::error::Existing-media verification requires preview mode and a numeric id."
+                exit 1
+              fi
+              QUERY="${QUERY}&verify_media_id=${VERIFY_MEDIA_ID}"
+            fi
             if [ "${FORCE_REPOST}" = "true" ]; then
               QUERY="${QUERY}&force=true"
             fi
             SEPARATOR="?"
             case "${AUTOMATION_URL}" in *\?*) SEPARATOR="&" ;; esac
             RETRY_OPTIONS=()
-            REQUEST_TIMEOUT=180
+            REQUEST_TIMEOUT=240
             if [ "${DRY_RUN}" = "true" ]; then
               RETRY_OPTIONS=(--retry 2 --retry-delay 5 --retry-max-time 120)
-              REQUEST_TIMEOUT=60
+              REQUEST_TIMEOUT=120
             fi
             echo "Requesting ${TARGET_DATE}/${SLOT} at $(date --iso-8601=seconds) JST; dry_run=${DRY_RUN:-false}."
             curl --fail-with-body --show-error --silent --max-time "${REQUEST_TIMEOUT}" \
@@ -222,3 +234,20 @@ jobs:
         with:
           path: .story-published/${{ steps.resolve.outputs.target_date }}-${{ steps.resolve.outputs.slot }}.done
           key: instagram-story-${{ steps.resolve.outputs.target_date }}-${{ steps.resolve.outputs.slot }}
+
+      - name: Verify published image delivery
+        # Keep the published marker even when a read-only delivery check fails.
+        # A published id must never be mistaken for an unposted slot.
+        if: steps.publish-story.outcome == 'success' && inputs.mark_published_only != true && (inputs.dry_run != true || inputs.verify_media_id != '')
+        run: |
+          python - <<'PY'
+          import json
+          record = json.load(open("story-response.json"))
+          check = record.get("delivery_check", {})
+          assert check.get("passed") is True, (
+              "Published image delivery is not confirmed. Do not resend. "
+              + str(check.get("reason", "delivery check missing"))
+          )
+          assert check.get("image", {}).get("matches_render") is True, "Delivered image did not match the approved render"
+          print("Instagram delivered image verified against the approved render.")
+          PY

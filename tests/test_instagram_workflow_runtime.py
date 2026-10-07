@@ -24,9 +24,15 @@ def publishing_script():
                      for line in block.splitlines())
 
 
+def delivery_script():
+    workflow = (ROOT / ".github/workflows/daily-instagram-story.yml").read_text(encoding="utf-8")
+    block = workflow.split("      - name: Verify published image delivery", 1)[1].split("        run: |\n", 1)[1]
+    return "\n".join(line[10:] if line.startswith("          ") else line for line in block.splitlines())
+
+
 @unittest.skipUnless(BASH, "Bash is required to test the GitHub publishing shell")
 class WorkflowRuntimeTests(unittest.TestCase):
-    def run_stub(self, *, preview, get_statuses=(200,), post_statuses=(200,)):
+    def run_stub(self, *, preview, get_statuses=(200,), post_statuses=(200,), delivered=True):
         seen = {"GET": 0, "POST": 0}
         class Handler(BaseHTTPRequestHandler):
             def reply(self, method, statuses):
@@ -37,6 +43,8 @@ class WorkflowRuntimeTests(unittest.TestCase):
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 body = {"status": "dry_run" if preview else "published"} if status == 200 else {"error": "temporary"}
+                if status == 200 and not preview:
+                    body["delivery_check"] = {"passed": delivered, "image": {"matches_render": delivered}}
                 self.wfile.write(json.dumps(body).encode())
             def do_GET(self):
                 self.reply("GET", get_statuses)
@@ -55,7 +63,8 @@ class WorkflowRuntimeTests(unittest.TestCase):
                        "PUBLISH_EPOCH": "0", "DRY_RUN": "true" if preview else "false", "FORCE_REPOST": "false",
                        "MARK_PUBLISHED_ONLY": "false", "NO_PROXY": "127.0.0.1", "no_proxy": "127.0.0.1"}
                 # GitHub's default Bash runner exits on the first failed command.
-                result = subprocess.run([BASH, "-e", "-c", publishing_script()], cwd=tmp, env=env,
+                script = publishing_script() + ("\n" + delivery_script() if not preview else "")
+                result = subprocess.run([BASH, "-e", "-c", script], cwd=tmp, env=env,
                                         timeout=45, capture_output=True, encoding="utf-8")
                 response_file = Path(tmp) / "story-response.json"
                 body = response_file.read_text() if response_file.exists() else None
@@ -85,6 +94,13 @@ class WorkflowRuntimeTests(unittest.TestCase):
         self.assertEqual(seen, {"GET": 3, "POST": 0})
         self.assertIn("no publish request was sent", result.stdout)
         self.assertFalse(marker)
+
+    def test_failed_delivery_reports_error_but_keeps_published_marker(self):
+        result, seen, body, marker = self.run_stub(preview=False, delivered=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(seen, {"GET": 1, "POST": 1})
+        self.assertTrue(marker)
+        self.assertIn("Do not resend", result.stderr)
 
 
 if __name__ == "__main__":

@@ -26,7 +26,9 @@ def story_version():
         VERSION,
         editorial_stock,
     )
+    from .story_delivery import DELIVERY_VERSION
     return {"version": VERSION, "effective_from_jst": START.isoformat(),
+            "delivery_version": DELIVERY_VERSION,
             "horoscope_copy_version": HOROSCOPE_COPY_VERSION,
             "horoscope_effective_from_jst": HOROSCOPE_COPY_START.isoformat(),
             "editorial_stock": editorial_stock()}
@@ -36,7 +38,7 @@ def story_version():
 def story_asset(target_date: str, filename: str) -> FileResponse:
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", target_date):
         raise HTTPException(status_code=404, detail="not found")
-    if not re.fullmatch(r"(?:preview-)?(?:morning|noon|evening|night)\.jpg", filename):
+    if not re.fullmatch(r"(?:preview-)?(?:morning|noon|evening|night)(?:-[0-9a-f]{32})?\.jpg", filename):
         raise HTTPException(status_code=404, detail="not found")
     asset = ROOT / "generated" / "story_assets" / target_date / filename
     if not asset.is_file():
@@ -54,19 +56,28 @@ def daily_story_automation(
     slot: str = "morning",
     dry_run: bool = False,
     force: bool = False,
+    verify_media_id: str | None = None,
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
 ) -> JSONResponse:
     expected = os.getenv("AUTOMATION_SECRET", "")
     received = (authorization or "").removeprefix("Bearer ").strip()
     if not expected or not received or not secrets.compare_digest(expected, received):
         raise HTTPException(status_code=401, detail="unauthorized")
+    if verify_media_id and (not dry_run or not re.fullmatch(r"\d{5,30}",verify_media_id)):
+        raise HTTPException(status_code=400, detail="Media verification requires preview mode and a numeric media id")
     try:
         result = run_story_slot(
             target_date,
             slot=slot,
             dry_run=dry_run,
             force=force,
+            check_source=bool(verify_media_id),
         )
+        if verify_media_id:
+            from .instagram import InstagramPublisher
+            publisher=InstagramPublisher()
+            publisher.verify_published(verify_media_id,expected_image=Path(result["asset_file"]).read_bytes())
+            result["delivery_check"]=publisher.last_delivery_check
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="日付の形式を確認してください。") from exc
     except Exception as exc:
