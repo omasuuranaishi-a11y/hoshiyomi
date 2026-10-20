@@ -20,8 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 @app.get("/api/automation/story-version")
 def story_version():
     from .story_program import (
-        HOROSCOPE_COPY_START,
-        HOROSCOPE_COPY_VERSION,
+        HOROSCOPE_CLEAR_START as HOROSCOPE_COPY_START,
+        HOROSCOPE_CLEAR_VERSION as HOROSCOPE_COPY_VERSION,
         START,
         VERSION,
         editorial_stock,

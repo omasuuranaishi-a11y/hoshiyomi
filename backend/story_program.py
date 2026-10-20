@@ -8,6 +8,8 @@ START = date(2026, 9, 7)
 VERSION = "2026-09-20-almanac-v4"
 HOROSCOPE_COPY_START = date(2026, 9, 30)
 HOROSCOPE_COPY_VERSION = "2026-09-30-daily-life-v3"
+HOROSCOPE_CLEAR_START = date(2026, 10, 21)
+HOROSCOPE_CLEAR_VERSION = "2026-10-21-daily-clear-v4"
 COLUMNS = json.loads((ROOT / "story_columns.json").read_text(encoding="utf-8"))
 DICTIONARY = json.loads((ROOT / "story_dictionary.json").read_text(encoding="utf-8"))
 SIGN_NAMES = ("牡羊座","牡牛座","双子座","蟹座","獅子座","乙女座","天秤座","蠍座","射手座","山羊座","水瓶座","魚座")
@@ -52,6 +54,30 @@ HOUSE_ACTIONS = (
 )
 
 
+# Approved October 21 sample: familiar situations and one concrete action.
+# Keep earlier versions intact, and rotate five actions within each daily theme.
+CLEAR_HOUSE_OPENINGS = (
+ "自分の希望が見える。","出費を見直したい日。","連絡が増えそうな日。",
+ "家のことが気になる。","気分転換をしたい日。","予定を詰めやすい日。",
+ "話がすれ違いやすい。","負担が偏りやすい。","調べると糸口がある。",
+ "小さな成果が出そう。","相談すると進みそう。","考えすぎて疲れそう。",
+)
+CLEAR_HOUSE_ACTIONS = (
+ ("できる範囲を伝える。","希望の時間を伝える。","行きたい店を提案。","今日は無理と伝える。","自分の予定も確認。"),
+ ("買う前に在庫確認。","定期購入を確認。","使わない物を整理。","買う物をメモする。","支出を一つ記録。"),
+ ("日時を確かめて返信。","未返信を一件返す。","予定の変更を連絡。","用件を分けて伝える。","会う場所を確認。"),
+ ("机の上を片づける。","玄関の靴をそろえる。","寝る前に洗い物を。","家族と予定を確認。","帰宅後は部屋で休む。"),
+ ("好きな曲でひと息。","昼休みに少し散歩。","好きな本を五分読む。","趣味に10分使う。","気になる映画を選ぶ。"),
+ ("休憩も予定に入れる。","急がない用事は明日。","移動の時間も計算。","空き時間を一つ残す。","終える時刻を決める。"),
+ ("聞いた内容を確認。","金額と期限を確認。","約束をメモに残す。","結論を先に伝える。","不明な点は聞き直す。"),
+ ("家事を一つ頼む。","一人で悩まず相談。","共有の費用を確認。","役割分担を話す。","頼める用事を分ける。"),
+ ("気になる言葉を検索。","手順を一度読み直す。","詳しい人に聞く。","説明書を開いて確認。","別の方法も調べる。"),
+ ("済んだ仕事を報告。","終えた用事を記録。","できた事を一つ書く。","進んだ所まで共有。","片づいた場所を保つ。"),
+ ("詳しい人に相談を。","困った点を一つ話す。","相談できる人へ連絡。","同僚に手順を聞く。","友人に意見を聞く。"),
+ ("通知を切ってひと息。","寝る前はスマホ休み。","温かい飲み物で休む。","考え事を紙に書く。","今日は早めに床へ。"),
+)
+
+
 def editorial_stock():
     """End of distinct dated stock; monitoring replenishes before wraparound."""
     column_days=len(COLUMNS)
@@ -66,9 +92,18 @@ def _horoscope(facts, day):
     aspects=facts.get("major_aspects",[])
     primary=aspects[0] if aspects else None
     mode=0 if primary and primary["aspect"] in {"トライン","セクスタイル"} else 1 if primary and primary["aspect"]=="コンジャンクション" else 2
-    openings=HOUSE_OPENINGS if day >= HOROSCOPE_COPY_START else LEGACY_HOUSE_OPENINGS
-    actions=HOUSE_ACTIONS if day >= HOROSCOPE_COPY_START else LEGACY_HOUSE_ACTIONS
-    action_index=(day-HOROSCOPE_COPY_START).days%len(actions[0]) if day >= HOROSCOPE_COPY_START else mode
+    if day >= HOROSCOPE_CLEAR_START:
+        openings,actions=CLEAR_HOUSE_OPENINGS,CLEAR_HOUSE_ACTIONS
+        action_index=(day-HOROSCOPE_CLEAR_START).days%len(actions[0])
+        copy_version=HOROSCOPE_CLEAR_VERSION
+    elif day >= HOROSCOPE_COPY_START:
+        openings,actions=HOUSE_OPENINGS,HOUSE_ACTIONS
+        action_index=(day-HOROSCOPE_COPY_START).days%len(actions[0])
+        copy_version=HOROSCOPE_COPY_VERSION
+    else:
+        openings,actions=LEGACY_HOUSE_OPENINGS,LEGACY_HOUSE_ACTIONS
+        action_index=mode
+        copy_version=VERSION
     items=[]
     for index,sign in enumerate(SIGN_NAMES):
         house=(moon_index-index)%12+1
@@ -76,7 +111,7 @@ def _horoscope(facts, day):
         items.append({"sign":sign,"house":house,"text":openings[house-1]+action,"element":index%4})
     return dict(slot="noon",content_kind="horoscope_20260907",title="12星座 きょうの運勢",items=items,
                 moon_sign=facts["moon"]["sign"],scene_key="daily_twelve_signs",
-                copy_version=HOROSCOPE_COPY_VERSION if day >= HOROSCOPE_COPY_START else VERSION,
+                copy_version=copy_version,
                 method="太陽星座を第1の領域とするサイン単位の一般向け解釈。出生時刻による個人ハウスではない。",
                 source_positions=facts["positions"],source_aspects=aspects,reading_hour_jst=5)
 
