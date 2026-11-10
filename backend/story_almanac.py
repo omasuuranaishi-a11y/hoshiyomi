@@ -1,10 +1,15 @@
-"""Editorial almanac renderer approved for the 05:00 Instagram Story."""
+"""Editorial almanac renderer approved for the 04:00 Instagram Story."""
 from __future__ import annotations
 from datetime import date
 from math import cos, sin, pi
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from .story_quality import FONT_DIR, _wrap_kinsoku
+
+PHOTO_TRIAL_START = date(2026, 11, 11)
+PHOTO_TRIAL_END = date(2026, 11, 17)
+PHOTO_TRIAL_ASSETS = Path(__file__).with_name('assets') / 'almanac-photo-trial'
+PHOTO_TRIAL_DESIGN = 'astrology_almanac_2026-11-11_photo_trial'
 
 W,H=1080,1920
 INK='#454540'; PAPER='#fbfaf6'; YELLOW='#f4cf00'; GRAY='#77766f'; RULE='#aaa89f'
@@ -70,12 +75,14 @@ def render_almanac(content:dict,day:date,path:str|Path)->Path:
     dday=day.day; moon=content['moon_sign']; phase=_short_phase(content['phase']); illum=float(content['illumination'])
     aspect=content.get('aspect'); main_l,main_r=400,990
     main_c=(main_l+main_r)/2
+    photo_trial = PHOTO_TRIAL_START <= day <= PHOTO_TRIAL_END
     im=Image.new('RGB',(W,H),PAPER);d=ImageDraw.Draw(im)
     d.rectangle((22,22,W-22,H-22),outline='#b9b7ae',width=2)
     d.line((70,114,1010,114),fill=INK,width=2)
     _center(d,'月の動きと星の配置を、暮らしの言葉で',40,_font(44,600),left=70,right=1010)
-    d.text((72,132),'OMASU  ASTROLOGY ALMANAC',font=_font(17,500,True),fill=GRAY)
-    d.text((1008,132),f'VOL. {day.timetuple().tm_yday:03d}',font=_font(17,500,True),fill=GRAY,anchor='ra')
+    if not photo_trial:
+        d.text((72,132),'OMASU  ASTROLOGY ALMANAC',font=_font(17,500,True),fill=GRAY)
+        d.text((1008,132),f'VOL. {day.timetuple().tm_yday:03d}',font=_font(17,500,True),fill=GRAY,anchor='ra')
     weekday_marks='㈪㈫㈬㈭㈮㈯㈰'
     _center(d,f'{day.year}年{day.month}月{dday}日{weekday_marks[day.weekday()]}',168,_font(57,600),left=main_l,right=main_r)
     d.line((main_c-237.5,300,main_c+237.5,300),fill=INK,width=1)
@@ -100,16 +107,23 @@ def render_almanac(content:dict,day:date,path:str|Path)->Path:
     for line in lines:
         yy=_center_block(d,line.format(**fmt),72,292,yy,_font(34,500,True),9)+18
 
-    # Main lunar arc.
-    cx,cy,rx,ry=main_c,594,300,250;d.arc((cx-rx,cy-ry,cx+rx,cy+ry),185,355,fill=GRAY,width=2)
-    for i in range(15):
-        a=pi+(pi*i/14);x=cx+rx*cos(a);y=cy+ry*sin(a);r=15 if i in (0,14) else 12
-        d.ellipse((x-r,y-r,x+r,y+r),fill=YELLOW)
-        if i<7:d.ellipse((x-r+7,y-r-2,x+r+7,y+r-2),fill=PAPER)
-        elif i>7:d.ellipse((x-r-7,y-r-2,x+r-7,y+r-2),fill=PAPER)
-        if i in (0,3,7,11,14):
-            label=('新月','今日','満月','下弦','新月')[(0,3,7,11,14).index(i)];_center(d,label,y+34,_font(18),GRAY,x-55,x+55)
-    _center(d,'月のリズム',598,_font(29,500,True),GRAY,main_l,main_r)
+    if photo_trial:
+        with Image.open(PHOTO_TRIAL_ASSETS / f'{day.isoformat()}.jpg') as photo:
+            if photo.size != (582, 280):
+                raise ValueError(f'Invalid almanac photo dimensions for {day}')
+            im.paste(photo, (main_l + 4, 337))
+        d.rectangle((main_l, 333, main_r - 1, 620), outline=RULE)
+    else:
+        # Main lunar arc.
+        cx,cy,rx,ry=main_c,594,300,250;d.arc((cx-rx,cy-ry,cx+rx,cy+ry),185,355,fill=GRAY,width=2)
+        for i in range(15):
+            a=pi+(pi*i/14);x=cx+rx*cos(a);y=cy+ry*sin(a);r=15 if i in (0,14) else 12
+            d.ellipse((x-r,y-r,x+r,y+r),fill=YELLOW)
+            if i<7:d.ellipse((x-r+7,y-r-2,x+r+7,y+r-2),fill=PAPER)
+            elif i>7:d.ellipse((x-r-7,y-r-2,x+r-7,y+r-2),fill=PAPER)
+            if i in (0,3,7,11,14):
+                label=('新月','今日','満月','下弦','新月')[(0,3,7,11,14).index(i)];_center(d,label,y+34,_font(18),GRAY,x-55,x+55)
+        _center(d,'月のリズム',598,_font(29,500,True),GRAY,main_l,main_r)
     _center(d,f'月 は {moon}',647,_font(60,650),left=main_l,right=main_r)
     _center(d,f'{moon} {float(content["moon_degree"]):.1f}°を運行中',733,_font(32),GRAY,main_l,main_r);d.line((main_l,792,main_r,792),fill=INK,width=1)
 
@@ -135,9 +149,10 @@ def render_almanac(content:dict,day:date,path:str|Path)->Path:
     _center_block(d,action,main_l,main_r,1551,_font(35,450,True),13)
     # Instagramの下部UIに隠れないよう半円と文字を上へ移動。
     d.pieslice((main_c-350,1688,main_c+350,2168),180,360,fill=YELLOW)
-    _center(d,'今日の星ことば',1726,_font(28,650,True),left=main_l,right=main_r)
-    _center_block(d,_daily_quote(moon,day),440,950,1776,_font(34,650),8)
-    _center(d,'@omasu_horoscope',1830,_font(23,sans=True),left=main_l,right=main_r)
+    _center(d,'今日の星ことば',1708 if photo_trial else 1726,_font(28,650,True),left=main_l,right=main_r)
+    _center_block(d,_daily_quote(moon,day),440,950,1754 if photo_trial else 1776,_font(34,650),8)
+    if not photo_trial:
+        _center(d,'@omasu_horoscope',1830,_font(23,sans=True),left=main_l,right=main_r)
     path=Path(path);path.parent.mkdir(parents=True,exist_ok=True);im.save(path,'JPEG',quality=96,subsampling=0)
-    content['render_check']={'overlap_free':True,'minimum_px':23,'body_px':32,'design':'astrology_almanac_v2-readable'}
+    content['render_check']={'overlap_free':True,'minimum_px':23,'body_px':32,'design':PHOTO_TRIAL_DESIGN if photo_trial else 'astrology_almanac_v2-readable'}
     return path
