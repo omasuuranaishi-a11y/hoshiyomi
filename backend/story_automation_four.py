@@ -12,10 +12,15 @@ from .story_four import SLOTS,build_slot_content,render_slot_story
 from .story_quality import design_variant,validate_story_asset
 from .story_sky_daily import build_daily_sky
 
+MORNING_ONLY_START = date(2026, 11, 11)
+
+
 def run_story_slot(target_date:str|date|None=None,*,slot:str="morning",dry_run:bool=False,force:bool=False,check_source:bool=False,generated_root:str|Path|None=None)->dict[str,Any]:
     if slot not in SLOTS:
         raise ValueError("slot must be morning, noon, evening, or night")
     target=_target_date(target_date)
+    if not dry_run and target >= MORNING_ONLY_START and slot in {"noon", "evening"}:
+        raise ValueError("Only the 04:00 almanac is enabled from 2026-11-11 JST")
     generated=Path(generated_root or DEFAULT_GENERATED_ROOT)
     record_suffix="-preview" if dry_run else ""
     record_path=generated/"story_runs"/f"{target.isoformat()}-{slot}{record_suffix}.json"

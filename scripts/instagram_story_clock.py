@@ -18,6 +18,7 @@ JST = timezone(timedelta(hours=9))
 PUBLISHER = "daily-instagram-story.yml"
 CLOCK = "instagram-story-clock.yml"
 SLOTS = (("morning", 4), ("horoscope", 5), ("evening", 17))
+MORNING_ONLY_START = date(2026, 11, 11)
 LEAD = timedelta(minutes=15)
 MAX_RUNTIME_MINUTES = 170
 ACTIVE = {"queued", "in_progress", "waiting", "pending", "requested"}
@@ -33,6 +34,10 @@ def log(message: str) -> None:
     print(f"{datetime.now(JST).isoformat(timespec='seconds')} {message}", flush=True)
 
 
+def scheduled_slots(target: date):
+    return SLOTS[:1] if target >= MORNING_ONLY_START else SLOTS
+
+
 def upcoming_slots(now: datetime, start_date: date):
     """Only current/future slots; never backfill an elapsed publishing time."""
     if now.utcoffset() is None:
@@ -42,7 +47,7 @@ def upcoming_slots(now: datetime, start_date: date):
         target = local.date() + timedelta(days=offset)
         if target < start_date:
             continue
-        for slot, hour in SLOTS:
+        for slot, hour in scheduled_slots(target):
             due = datetime.combine(target, day_time(hour), JST)
             if local < due:
                 yield target, slot, due
@@ -51,6 +56,8 @@ def upcoming_slots(now: datetime, start_date: date):
 def publication_inputs(target: date, slot: str, request_id: str, *, preview=False):
     if slot not in {name for name, _ in SLOTS}:
         raise ValueError("Unsupported story slot")
+    if not preview and slot not in {name for name, _ in scheduled_slots(target)}:
+        raise ValueError("Only the 04:00 almanac is enabled from 2026-11-11 JST")
     return {
         "slot": slot,
         "target_date": target.isoformat(),
@@ -160,7 +167,8 @@ def run_clock(api: GitHub, start_date: date, runtime_minutes: int):
                 if prepared:
                     handled.add(ticket)
         if time.monotonic() >= next_heartbeat:
-            log("Clock healthy; times=04:00,05:00,17:00 JST; no past-slot dispatches")
+            times = ",".join(f"{hour:02d}:00" for _, hour in scheduled_slots(now.date()))
+            log(f"Clock healthy; times={times} JST; no past-slot dispatches")
             next_heartbeat = time.monotonic() + 300
         time.sleep(min(20, max(0, deadline - time.monotonic())))
     log("Clock interval complete; handing off to next runner")
@@ -170,7 +178,7 @@ def verify(api: GitHub, target: date):
     """Exercise the real dispatch path using previews, then a short handoff."""
     log(f"Cache API verified; preview-date morning marker={api.published(target, 'morning')}")
     tickets = []
-    for slot, _ in SLOTS:
+    for slot, _ in scheduled_slots(target):
         ticket = f"verify-{target}-{slot}-{os.environ['GITHUB_RUN_ID']}"
         api.dispatch(PUBLISHER, publication_inputs(target, slot, ticket, preview=True))
         tickets.append(f"clock-{ticket}")

@@ -25,6 +25,27 @@ class ClockTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             list(clock.upcoming_slots(datetime(2026, 10, 7, 3), date(2026, 10, 7)))
 
+    def test_morning_only_from_november_11(self):
+        now = datetime(2026, 11, 10, 16, 59, tzinfo=clock.JST)
+        slots = list(clock.upcoming_slots(now, date(2026, 10, 7)))
+        self.assertEqual(
+            [(target, slot) for target, slot, _ in slots],
+            [(date(2026, 11, 10), "evening"), (date(2026, 11, 11), "morning")],
+        )
+        now = datetime(2026, 11, 11, 4, tzinfo=clock.JST)
+        self.assertEqual(
+            [(target, slot) for target, slot, _ in clock.upcoming_slots(now, date(2026, 10, 7))],
+            [(date(2026, 11, 12), "morning")],
+        )
+
+    def test_stopped_slots_cannot_dispatch_live(self):
+        for slot in ("horoscope", "evening"):
+            with self.subTest(slot=slot):
+                with self.assertRaisesRegex(ValueError, "Only the 04:00 almanac"):
+                    clock.publication_inputs(date(2026, 11, 11), slot, "stopped")
+                inputs = clock.publication_inputs(date(2026, 11, 11), slot, "preview", preview=True)
+                self.assertEqual(inputs["dry_run"], "true")
+
     def request_api(self):
         api = object.__new__(clock.GitHub)
         api.repo = "example/repository"

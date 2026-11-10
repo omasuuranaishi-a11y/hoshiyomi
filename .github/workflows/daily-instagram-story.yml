@@ -1,5 +1,5 @@
-name: Three Daily Instagram Stories
-run-name: ${{ inputs.clock_request_id && format('clock-{0}', inputs.clock_request_id) || 'Three Daily Instagram Stories' }}
+name: Daily Instagram Almanac
+run-name: ${{ inputs.clock_request_id && format('clock-{0}', inputs.clock_request_id) || 'Daily Instagram Almanac' }}
 
 env:
   TZ: Asia/Tokyo
@@ -14,12 +14,6 @@ on:
     - cron: "43 16 * * *"  # 01:43 JST -> morning primary waits for 04:00
     - cron: "31 17 * * *"  # 02:31 JST -> second morning chance
     - cron: "19 18 * * *"  # 03:19 JST -> third morning chance
-    - cron: "55 19 * * *"  # 04:55 JST -> 12 signs primary at 05:00
-    - cron: "10 20 * * *"  # 05:10 JST -> 12 signs backup
-    - cron: "25 20 * * *"  # 05:25 JST -> 12 signs watchdog
-    - cron: "55 7 * * *"   # 16:55 JST -> dictionary primary at 17:00
-    - cron: "10 8 * * *"   # 17:10 JST -> dictionary backup
-    - cron: "25 8 * * *"   # 17:25 JST -> dictionary watchdog
   workflow_dispatch:
     inputs:
       slot:
@@ -81,6 +75,7 @@ jobs:
           MANUAL_TARGET_DATE: ${{ inputs.target_date }}
           EVENT_NAME: ${{ github.event_name }}
           WAIT_UNTIL_SLOT: ${{ inputs.wait_until_slot }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           case "${SCHEDULE}" in
             "43 16 * * *"|"31 17 * * *"|"19 18 * * *"|"43 17 * * *"|"31 18 * * *"|"19 19 * * *") SLOT="morning"; PUBLISH_AT="04:00" ;;
@@ -97,6 +92,10 @@ jobs:
           esac
           TODAY_JST="$(TZ=Asia/Tokyo date +%F)"
           TARGET_DATE="${MANUAL_TARGET_DATE:-${TODAY_JST}}"
+          if [ "${TARGET_DATE}" \> "2026-11-10" ] && [ "${SLOT}" != "morning" ] && [ "${DRY_RUN}" != "true" ]; then
+            echo "Only the 04:00 almanac is enabled from 2026-11-11 JST; skipping ${TARGET_DATE}/${SLOT}."
+            exit 0
+          fi
           if [ "${EVENT_NAME}" = "schedule" ] && [ "${TODAY_JST}" \< "2026-08-15" ]; then
             echo "Automatic Instagram stories start on 2026-08-15 JST; skipping ${TODAY_JST}."
             exit 0

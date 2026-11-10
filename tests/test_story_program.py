@@ -89,3 +89,15 @@ def test_published_marker_skips_before_generating_or_posting(monkeypatch,tmp_pat
     monkeypatch.setattr(automation,"build_daily_sky",lambda *args,**kwargs:pytest.fail("Already published must skip"))
     result=automation.run_story_slot(START,slot="night",generated_root=tmp_path)
     assert result["skipped"] and result["media_id"]=="existing"
+
+
+@pytest.mark.parametrize("slot", ["noon", "evening"])
+@pytest.mark.parametrize("force", [False, True])
+def test_stopped_slots_never_generate_or_publish(monkeypatch, tmp_path, slot, force):
+    monkeypatch.setattr(automation, "build_daily_sky",
+                        lambda *args, **kwargs: pytest.fail("Stopped slot must not generate"))
+    monkeypatch.setattr(automation, "InstagramPublisher",
+                        lambda: pytest.fail("Stopped slot must not contact Instagram"))
+    with pytest.raises(ValueError, match="Only the 04:00 almanac"):
+        automation.run_story_slot("2026-11-11", slot=slot, force=force, generated_root=tmp_path)
+    assert list(tmp_path.iterdir()) == []

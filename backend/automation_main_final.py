@@ -11,7 +11,7 @@ from fastapi import Header, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 
 from .main import app
-from .story_automation_four import run_story_slot
+from .story_automation_four import MORNING_ONLY_START, run_story_slot
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +35,8 @@ def story_version():
             "almanac_photo_trial": {"design": PHOTO_TRIAL_DESIGN,
                                     "start_jst": PHOTO_TRIAL_START.isoformat(),
                                     "end_jst": PHOTO_TRIAL_END.isoformat()},
+            "publishing_schedule": {"effective_from_jst": MORNING_ONLY_START.isoformat(),
+                                    "slots_jst": {"morning": "04:00"}},
             "editorial_stock": editorial_stock()}
 
 
